@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoAG Live Monitor</title>
+    <script src="/static/socket.io.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #05070e;
+            --surface: rgba(255, 255, 255, 0.05);
+            --surface-strong: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f4f4f5;
+            --muted: #9da2b6;
+            --accent: #66e2a4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 3rem 1.5rem 4rem;
+            min-height: 100vh;
+            background: radial-gradient(circle at top, #111830, var(--bg));
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.35s ease;
+        }
+
+        body.live-match {
+            background: radial-gradient(circle at top, #7f1d1d, #2d0606);
+        }
+
+        .layout {
+            width: min(600px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.75rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .live-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .live-label {
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        #live-camera {
+            font-size: clamp(2.5rem, 7vw, 4rem);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--surface-strong);
+            color: inherit;
+            font-size: 1rem;
+            appearance: none;
+            outline: none;
+        }
+
+        .list-card h2 {
+            margin: 0 0 0.8rem;
+            font-size: 1rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .chip {
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        footer {
+            text-align: right;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <section class="panel live-card">
+            <span class="live-label">Aktuell live</span>
+            <div id="live-camera">—</div>
+            
+            <label for="camera-select">Zu überwachende Kamera</label>
+            <select id="camera-select"></select>
+        </section>
+
+        <section class="panel list-card">
+            <h2>Gesamte Liste</h2>
+            <div class="chips" id="list-chips">
+                <span class="muted">Keine Liste empfangen.</span>
+            </div>
+        </section>
+
+        <footer>© VideoAG Christianeum</footer>
+    </div>
+
+    <script>
+        const socket = io();
+        const cameraSelect = document.getElementById("camera-select");
+        const liveCameraEl = document.getElementById("live-camera");
+        const listChipsEl = document.getElementById("list-chips");
+
+        const DEFAULT_CAMERA_COUNT = 8;
+        let tallyListe = [];
+        let kamera = 0;
+        let lastCameraCount = 0;
+
+        const normalizeList = (liste) => {
+            if (Array.isArray(liste)) return liste;
+            if (typeof liste === "string") {
+                try {
+                    const parsed = JSON.parse(liste);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch (error) {
+                    return liste.split(/[,;\s]+/).filter(Boolean);
+                }
+            }
+            return [];
+        };
+
+        const renderCameraOptions = () => {
+            const count = tallyListe.length || DEFAULT_CAMERA_COUNT;
+            if (lastCameraCount === count && cameraSelect.options.length === count) return;
+
+            const previous = Number(cameraSelect.value) || 1;
+            cameraSelect.innerHTML = "";
+            for (let i = 1; i <= count; i++) {
+                const option = document.createElement("option");
+                option.value = i;
+                option.textContent = `Kamera ${i}`;
+                cameraSelect.appendChild(option);
+            }
+            cameraSelect.value = String(previous <= count ? previous : 1);
+            lastCameraCount = count;
+        };
+
+        const updateSelectionHighlight = () => {
+            if (!cameraSelect.value) return;
+            const selectedCamera = Number(cameraSelect.value);
+            document.body.classList.toggle("live-match", kamera !== 0 && kamera === selectedCamera);
+        };
+
+        const renderLiveDisplay = () => {
+            liveCameraEl.textContent = kamera ? `Kamera ${kamera}` : "Keine Kamera live";
+        };
+
+        const renderListChips = () => {
+            listChipsEl.innerHTML = "";
+
+            if (!tallyListe.length) {
+                const span = document.createElement("span");
+                span.className = "muted";
+                span.textContent = "Keine Liste empfangen.";
+                listChipsEl.appendChild(span);
+                return;
+            }
+
+            tallyListe.forEach((item, index) => {
+                console.log(item)
+                if (index === 0 || item.tally === "0" || item.tally === "") return;
+                console.log(item.name)
+                const chip = document.createElement("div");
+                chip.className = "chip";
+                chip.textContent = `${item.name}: ${item.tally || "-"}`;
+                listChipsEl.appendChild(chip);
+            });
+        };
+
+        socket.on("Update", (data) => {
+            kamera = Number(data?.Kamera) || 0;
+            //tallyListe = normalizeList(data?.Liste);
+            tallyListe = data?.Liste.cameras;
+            //console.log(tallyListe)
+
+            renderCameraOptions();
+            updateSelectionHighlight();
+            renderLiveDisplay();
+            renderListChips();
+        });
+
+        renderCameraOptions();
+        cameraSelect.addEventListener("change", updateSelectionHighlight);
+    </script>
+</body>
+</html>

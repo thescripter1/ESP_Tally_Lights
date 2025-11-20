@@ -1,0 +1,46 @@
+{
+    "Kamera": 2,
+    "Liste": {
+        "cameras": [
+            null,
+            {
+                "name": "Kamera 1",
+                "tally": "0"
+            },
+            {
+                "name": "Kamera 2",
+                "tally": "A"
+            },
+            {
+                "name": "Kamera 3",
+                "tally": "A"
+            },
+            {
+                "name": "Kamera 4",
+                "tally": "A"
+            },
+            {
+                "name": "Kamera 5",
+                "tally": "0"
+            },
+            {
+                "name": "Kamera 6",
+                "tally": "0"
+            },
+            {
+                "name": "Kamera 7",
+                "tally": "0"
+            },
+            {
+                "name": "Kamera 8",
+                "tally": "A"
+            }
+        ],
+        "tallyPool": [
+            "A"
+        ]
+    },
+    "TallyPool": [
+        "A"
+    ]
+}

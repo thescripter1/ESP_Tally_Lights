@@ -1,10 +1,16 @@
 # ESP_Tally_Lights
 A DIY Tally Light Project for Blackmagic ATEM Video Switchers, wich uses MQTT and an ESP 8266
+> [!WARNING]
+> This project is a school project and I am really sorry for the bad language in the code, that is half German and some other nonsense. But feel free to adjust it.
 
 ![IMG_7120](https://github.com/user-attachments/assets/def7a56f-405d-4a1b-bcd7-a389e9b9be46)
 
 
 # Architecture
+
+This project uses a Raspberry Pi as a Server and simultaniosly an Acess Point, which the ESP Tally Lights log on to. This Wifi Network also allows useres to connect with their phones and access either the admin or client dashboard.
+
+# Build your own
 
 If you want to build your own Version, you can 3D Print most of the parts. A rough part list can be found under CAD / Part-List
 
@@ -56,8 +62,20 @@ wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 ```
 
+### 4. Change the Hostapd File
 
+```bash
+sudo nano /etc/default/hostapd
+```
 
+change this line:
+```bash
+#DAEMON_CONF=""
+```
+to 
+```bash
+DAEMON_CONF="/etc/hostapd/hostapd.conf"
+```
 
-
+### 5. Setup the DHCP Server
 

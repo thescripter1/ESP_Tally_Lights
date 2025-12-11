@@ -1,6 +1,9 @@
 # ESP_Tally_Lights
 A DIY Tally Light Project for Blackmagic ATEM Video Switchers, wich uses MQTT and an ESP 8266
 
+![IMG_7120](https://github.com/user-attachments/assets/def7a56f-405d-4a1b-bcd7-a389e9b9be46)
+
+
 # Architecture
 
 If you want to build your own Version, you can 3D Print most of the parts. A rough part list can be found under CAD / Part-List

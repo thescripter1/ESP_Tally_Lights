@@ -2,6 +2,7 @@ import time
 import paho.mqtt.client as mqtt
 from shared_state import get_Liste, set_Pool
 
+
 broker = "127.0.0.1"
 client = mqtt.Client()
 
@@ -23,28 +24,35 @@ def calculateBuchstabe(kamernummer):
     if kamernummer != 0:
         return TallyListe["cameras"][kamernummer]["tally"]
 
-
-def make_light(number, state):
-    char = calculateBuchstabe(number)
-    if char != "0":
+def make_light(Kameranummer, code):
+    char = calculateBuchstabe(Kameranummer)
+    if char != "0" or None:
         adress = f"tally/lights/{char}"
-        client.publish(adress, state)
-        print("Sende Nachricht", state, "an", adress)
+        client.publish(adress, code)
+        client.publish(adress, code)
+        print("Sende Code", code, "an", adress)
 
 
-def makeDark(number):
-    make_light(number, 0)
+def makeDark(Kameranummer):
+    make_light(Kameranummer, "#000000")
 
-def makeRed(number):
-    make_light(number, 1)
+def makeRed(Kameranummer):
+    make_light(Kameranummer, "#ff0000")
 
 
 def makeLila(char):
     print("Folgendes Licht leuchtet nun für 2 Sekunden Lila:", char)
     adress = f"tally/lights/{char}"
-    client.publish(adress, 5)
+    client.publish(adress, "#c832c8")
+    client.publish(adress, "#c832c8")
     time.sleep(2)
-    client.publish(adress, 0)
+    client.publish(adress, "#000000")
+    client.publish(adress, "#000000")
+
+def make_Farbe(char, farbe):
+    adress = f"tally/lights/{char}"
+    client.publish(adress, farbe)
+    client.publish(adress, farbe)
 
 def disconnect_Tally():
     client.disconnect()

@@ -20,7 +20,6 @@ def run():
 
         set_Kamera(new_input)
 
-       
         src = new_input
 
         if src != last_src:
@@ -57,9 +56,9 @@ def run2():
         print("Fehler:", e)
     finally:
         try:
+            last_src = switcher.programInput[0].videoSource.value
             while True:
                 src = switcher.programInput[0].videoSource.value
-
                 if src != last_src:
                     # Alten Port ausschalten, wenn gültig
                     if last_src < 9:
@@ -67,6 +66,7 @@ def run2():
                     # Neuen Port aktivieren, wenn gültig
                     if src < 9:
                         makeRed(src)
+                        set_Kamera(src)
                     else:
                         print(f"Achtung: src={src} außerhalb von devicelist-Länge (9). Ignoriere Aktivierung.")
 

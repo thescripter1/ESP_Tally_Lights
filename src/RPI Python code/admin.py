@@ -5,12 +5,15 @@ import time
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool
 from tally import makeLila
 
+from chat import save_message, get_latest_message
+
 app = Flask(__name__, static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 lastKamera = None
 lastListe = None
 lastPool = None
+last_message = None
 
 
 def _register_routes():
@@ -26,14 +29,20 @@ def _register_routes():
     def handle_marking(Licht):
         makeLila(Licht)
 
+    @socketio.on("chat")
+    def handle_mesaage(nachricht):
+        #print(nachricht)
+        save_message(nachricht)
+
 
 def _watcher():
-    global lastKamera, lastListe, lastPool
+    global lastKamera, lastListe, lastPool, last_message
 
     while True:
         Kamera = get_Kamera()
         Liste = get_Liste()
         Pool = get_Pool()
+        message = get_latest_message()
 
         if Kamera != lastKamera or Liste != lastListe or Pool != lastPool:
             socketio.emit(
@@ -43,6 +52,10 @@ def _watcher():
             lastKamera = Kamera
             lastListe = Liste
             lastPool = Pool
+
+        if  message != last_message:
+            socketio.emit("chat", message)
+            last_message = message
 
         time.sleep(0.2)
 

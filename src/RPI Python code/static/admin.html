@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VideoAG Admin</title>
-    <script src="/static/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
             color-scheme: light dark;
@@ -137,7 +137,7 @@
             inset: 0;
             opacity: 0;
             transition: opacity 0.25s ease;
-            background: radial-gradient(circle at top, rgba(96, 165, 250, 0.35), transparent 55%);
+            background: radial-gradient(circle at top, rgba(255, 255, 255, 0.35), transparent 55%);
         }
 
         .tile:hover {
@@ -167,6 +167,7 @@
             font-size: 1.35rem;
             font-weight: 600;
             letter-spacing: 0.04em;
+            color: var(--text);
         }
 
         .tile-sub {
@@ -174,7 +175,7 @@
             color: var(--muted);
         }
 
-        .list-card h2 {
+        .list-chat-card h2 {
             margin: 0 0 1rem;
             text-transform: uppercase;
             letter-spacing: 0.12em;
@@ -281,7 +282,7 @@
             color: var(--muted);
         }
 
-        input, select {
+        input {
             width: 100%;
             margin-top: 0.35rem;
             margin-bottom: 0.75rem;
@@ -291,11 +292,6 @@
             background: rgba(255, 255, 255, 0.03);
             color: inherit;
             font-size: 1rem;
-        }
-
-        select {
-            appearance: none;
-            cursor: pointer;
         }
 
         .modal__actions {
@@ -351,6 +347,190 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        .chat {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            padding: 2rem;
+            box-shadow: var(--panel-shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        .chat__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .chat__status {
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid rgba(211, 52, 52, 0.6);
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .chat__status--online {
+            border-color: rgba(52, 211, 153, 0.6);
+            color: var(--success);
+            box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.15);
+        }
+
+        .chat-interface {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-messages {
+            min-height: 160px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 0.75rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .chat-empty {
+            text-align: center;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+        }
+
+        .chat-bubble {
+            padding: 0.7rem 0.85rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-bubble--self {
+            background: rgba(96, 165, 250, 0.18);
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .chat-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.35rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .chat-text {
+            color: var(--text);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .chat-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .chat-input {
+            margin: 0;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .chat-send {
+            position: relative;
+        }
+
+        .chat-send__button {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            min-width: 160px;
+            padding-right: 0.9rem;
+            justify-content: space-between;
+        }
+
+        .chat-send__button::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 25%;
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            pointer-events: none;
+        }
+
+        .chat-send__button:hover::after {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-send__label {
+            text-align: left;
+        }
+
+        .chat-send__caret {
+            margin-left: auto;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .chat-menu {
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 8px);
+            width: 230px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--panel);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+            padding: 0.75rem;
+            display: none;
+            z-index: 10;
+        }
+
+        .chat-menu--open {
+            display: block;
+        }
+
+        .chat-menu__item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.35rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .chat-menu__item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chat-menu__item input {
+            margin: 0;
+            width: auto;
+        }
+
+        .chat-pill-warning {
+            padding: 0.6rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(250, 0, 54, 0.534);
+            border: 1px solid rgba(250, 96, 96, 0.3);
+            letter-spacing: 0.06em;
+            font-size: 0.9rem;
+            user-select: none;
+            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
     </style>
 </head>
 <body>
@@ -367,10 +547,32 @@
             <div class="camera-grid" id="camera-grid"></div>
         </section>
 
-        <section class="panel list-card">
+        <section class="panel list-chat-card">
             <h2>Verfügbare Tally Lights</h2>
             <div class="tally-bank" id="tally-bank">
                 <span class="tally-pill">Keine Lichter geladen</span>
+            </div>
+        </section>
+
+        <section class="chat list-chat-card">
+            <div class="chat__header">
+                <h2>Chat</h2>
+                <span class="chat__status" id="chat-status">Getrennt</span>
+            </div>
+            <div class="chat-interface">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-empty">Keine Nachrichten</div>
+                </div>
+                <form class="chat-form" id="chat-form">
+                    <input class="chat-input" id="chat-input" type="text" placeholder="Nachricht eingeben..." autocomplete="off">
+                    <div class="chat-send">
+                        <button class="btn btn-primary chat-send__button" type="submit" id="chat-send">
+                            <span class="chat-send__label" id="chat-send-label">Senden (Alle)</span>
+                            <span class="chat-send__caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="chat-menu" id="chat-menu" aria-hidden="true"></div>
+                    </div>
+                </form>
             </div>
         </section>
 
@@ -390,9 +592,6 @@
             <div>
                 <label for="camera-tally">Tally Light</label>
                 <input id="camera-tally" type="text" autocomplete="off" placeholder="z. B. A oder B" maxlength="6">
-                <select id="tally-select">
-                    <option value="">Aus Liste wählen …</option>
-                </select>
             </div>
             <div class="modal__actions">
                 <div class="test-wrapper">
@@ -408,45 +607,49 @@
 
     <script>
         const socket = io();
-        const cameraGrid = document.getElementById("camera-grid");
-        const tallyBankEl = document.getElementById("tally-bank");
-        const modal = document.getElementById("editor-modal");
-        const modalTitle = document.getElementById("modal-title");
-        const nameInput = document.getElementById("camera-name");
-        const tallyInput = document.getElementById("camera-tally");
-        const tallySelect = document.getElementById("tally-select");
-        const testButton = document.getElementById("test-light");
-        const cooldownBar = document.getElementById("test-cooldown");
-        const closeButton = document.getElementById("close-editor");
-        const modalCloseBtn = document.querySelector(".modal__close");
-        const liveIndicator = document.getElementById("live-indicator");
 
-        const CAMERA_COUNT = 8;
+        const el = {
+            cameraGrid: document.getElementById("camera-grid"),
+            tallyBank: document.getElementById("tally-bank"),
+            modal: document.getElementById("editor-modal"),
+            modalTitle: document.getElementById("modal-title"),
+            nameInput: document.getElementById("camera-name"),
+            tallyInput: document.getElementById("camera-tally"),
+            testButton: document.getElementById("test-light"),
+            cooldownBar: document.getElementById("test-cooldown"),
+            closeButton: document.getElementById("close-editor"),
+            modalCloseBtn: document.querySelector(".modal__close"),
+            liveIndicator: document.getElementById("live-indicator"),
+            chatMessages: document.getElementById("chat-messages"),
+            chatForm: document.getElementById("chat-form"),
+            chatInput: document.getElementById("chat-input"),
+            chatStatus: document.getElementById("chat-status"),
+            chatSendButton: document.getElementById("chat-send"),
+            chatMenu: document.getElementById("chat-menu"),
+            chatSendLabel: document.getElementById("chat-send-label")
+        };
 
+        const state = {
+            CAMERA_COUNT: 8,
+            cameraData: [],
+            kamera: 0,
+            editingIndex: null,
+            saveTimeout: null,
+            cooldownTimeout: null,
+            tallyPool: [],
+            chatLog: [],
+            recipients: ["all"]
+        };
 
-        let kamera = 0;
-        let editingIndex = null;
-        let saveTimeout = null;
-        let cooldownTimeout = null;
-        let tallyPool = [];
-        let camList = [];
-        let initialSyncComplete = false;
+        state.cameraData = createDefaultData();
 
-        
-        let cameraData = [];
-
-        function generateCameraData(liste){
-            if (!initialSyncComplete){
-                console.log("Hier muss die Liste entstehen")
-                const createDefaultData = () =>
-                Array.from({ length: CAMERA_COUNT }, (_, idx) => ({
-                    id: idx + 1,
-                    name: liste.cameras[idx + 1].name,
-                    tally: liste.cameras[idx + 1].tally
-                }));
-                return createDefaultData();
-            }
-            return cameraData;
+        // Helpers
+        function createDefaultData() {
+            return Array.from({ length: state.CAMERA_COUNT }, (_, idx) => ({
+                id: idx + 1,
+                name: `Kamera ${idx + 1}`,
+                tally: ""
+            }));
         }
 
         const normalizeList = (liste) => {
@@ -467,15 +670,153 @@
             return list[id] ?? list[id - 1];
         };
 
+        const displayTally = (value) => {
+            if (!value || `${value}`.trim() === "0") return "";
+            return value;
+        };
+
+        // Render functions
+        const renderGrid = () => {
+            el.cameraGrid.innerHTML = "";
+            state.cameraData.forEach((cam, index) => {
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = `tile${state.kamera === cam.id ? " live" : ""}`;
+                tile.dataset.index = index;
+                tile.innerHTML = `
+                    <span class="tile-id">K${cam.id}</span>
+                    <div class="tile-name">${cam.name || `Kamera ${cam.id}`}</div>
+                    <div class="tile-sub">${displayTally(cam.tally) ? `Tally: ${displayTally(cam.tally)}` : "Kein Tally zugewiesen"}</div>
+                `;
+                el.cameraGrid.appendChild(tile);
+            });
+            renderRecipientMenu();
+        };
+
+        const renderTallyBank = () => {
+            el.tallyBank.innerHTML = "";
+            if (!state.tallyPool.length) {
+                const span = document.createElement("span");
+                span.className = "tally-pill";
+                span.textContent = "Keine Lichter verfügbar";
+                span.style.cursor = "default";
+                el.tallyBank.appendChild(span);
+                return;
+            }
+            state.tallyPool.forEach((tally) => {
+                const pill = document.createElement("div");
+                pill.className = "tally-pill";
+                pill.textContent = tally;
+                pill.draggable = true;
+                pill.dataset.tally = tally;
+                el.tallyBank.appendChild(pill);
+            });
+        };
+
+        const updateLiveIndicator = () => {
+            if (!el.liveIndicator) return;
+            if (state.kamera) {
+                el.liveIndicator.textContent = `Live: Kamera ${state.kamera}`;
+                el.liveIndicator.classList.add("active");
+            } else {
+                el.liveIndicator.textContent = "Live: keine Kamera";
+                el.liveIndicator.classList.remove("active");
+            }
+            document.body.classList.toggle("live-match", Boolean(state.kamera));
+        };
+
+        // Chat helpers (minimal)
+        const renderRecipientMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.innerHTML = "";
+            const addOption = (value, label) => {
+                const item = document.createElement("label");
+                item.className = "chat-menu__item";
+                const input = document.createElement("input");
+                input.type = "checkbox";
+                input.value = value;
+                input.checked = state.recipients.includes(value);
+                input.onchange = () => {
+                    if (value === "all") {
+                        state.recipients = input.checked ? ["all"] : [];
+                    } else {
+                        state.recipients = state.recipients.filter((v) => v !== "all");
+                        state.recipients = input.checked
+                            ? [...state.recipients, value]
+                            : state.recipients.filter((v) => v !== value);
+                    }
+                    if (!state.recipients.length) state.recipients = ["all"];
+                    updateSendLabel();
+                    renderRecipientMenu();
+                };
+                item.append(input, document.createElement("span"));
+                item.lastChild.textContent = label;
+                el.chatMenu.appendChild(item);
+            };
+            addOption("all", "Alle");
+            state.cameraData.forEach((cam) => addOption(cam.id, cam.name || `Kamera ${cam.id}`));
+        };
+
+        const updateSendLabel = () => {
+            if (!el.chatSendLabel) return;
+            if (state.recipients.includes("all")) {
+                el.chatSendLabel.textContent = "Senden (Alle)";
+                return;
+            }
+            const names = state.recipients
+                .map((id) => state.cameraData.find((c) => String(c.id) === String(id))?.name || `K${id}`)
+                .filter(Boolean);
+            el.chatSendLabel.textContent = `Senden (${names.join(", ") || "Alle"})`;
+        };
+
+        const setChatStatus = (connected) => {
+            if (!el.chatStatus) return;
+            el.chatStatus.textContent = connected ? "Verbunden" : "Getrennt";
+            el.chatStatus.classList.toggle("chat__status--online", connected);
+        };
+
+        const renderChatMessages = () => {
+            if (!el.chatMessages) return;
+            el.chatMessages.innerHTML = "";
+            if (!state.chatLog.length) {
+                const empty = document.createElement("div");
+                empty.className = "chat-empty";
+                empty.textContent = "Keine Nachrichten";
+                el.chatMessages.appendChild(empty);
+                return;
+            }
+            state.chatLog.slice(-30).forEach((msg) => {
+                const bubble = document.createElement("div");
+                bubble.className = `chat-bubble${msg.self ? " chat-bubble--self" : ""}`;
+                bubble.textContent = `${msg.author || "?"}: ${msg.text || ""}`;
+                el.chatMessages.appendChild(bubble);
+            });
+            el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
+        };
+
+        const appendChatMessage = (msg) => {
+            if (!msg || !msg.text) return;
+            state.chatLog = [...state.chatLog, msg].slice(-40);
+            renderChatMessages();
+        };
+
+        const buildRecipientsPayload = () => {
+            if (state.recipients.includes("all")) {
+                return { all: "Alle" };
+            }
+            const payload = {};
+            state.recipients.forEach((id, idx) => {
+                const cam = state.cameraData.find((c) => String(c.id) === String(id));
+                payload[idx] = cam?.name || `Kamera ${id}`;
+            });
+            return payload;
+        };
+
         const applyServerData = (liste) => {
             const normalized = normalizeList(liste);
-            cameraData = generateCameraData(liste);
-            console.log(cameraData)
-            cameraData = cameraData.map((camera) => {
+            state.cameraData = state.cameraData.map((camera) => {
                 const entry = entryForCamera(normalized, camera.id);
-                if (!entry && entry !== "" && entry !== 0) {
-                    return camera;
-                }
+                if (!entry && entry !== "" && entry !== 0) return camera;
                 if (typeof entry === "object") {
                     return {
                         ...camera,
@@ -490,106 +831,36 @@
             });
         };
 
-        const displayTally = (value) => {
-            if (!value) return "";
-            if (`${value}`.trim() === "0") return "";
-            return value;
-        };
-
-        const renderGrid = () => {
-            cameraGrid.innerHTML = "";
-            
-            cameraData.forEach((cam, index) => {
-                const tile = document.createElement("button");
-                tile.type = "button";
-                tile.className = `tile${kamera === cam.id ? " live" : ""}`;
-                tile.dataset.index = index;
-                tile.dataset.cameraId = cam.id;
-                tile.innerHTML = `
-                    <span class="tile-id">K${cam.id}</span>
-                    <div class="tile-name">${cam.name || `Kamera ${cam.id}`}</div>
-                    <div class="tile-sub">${displayTally(cam.tally) ? `Tally: ${displayTally(cam.tally)}` : "Kein Tally zugewiesen"}</div>
-                `;
-                cameraGrid.appendChild(tile);
-            });
-        };
-
-        const renderTallyBank = () => {
-            tallyBankEl.innerHTML = "";
-            if (!tallyPool.length) {
-                const span = document.createElement("span");
-                span.className = "tally-pill";
-                span.textContent = "Keine Lichter verfügbar";
-                span.style.cursor = "default";
-                tallyBankEl.appendChild(span);
-                return;
-            }
-
-            tallyPool.forEach((tally) => {
-                const pill = document.createElement("div");
-                pill.className = "tally-pill";
-                pill.textContent = tally;
-                pill.draggable = true;
-                pill.dataset.tally = tally;
-                tallyBankEl.appendChild(pill);
-            });
-        };
-
-        const updateLiveIndicator = () => {
-            if (!liveIndicator) return;
-            if (kamera) {
-                liveIndicator.textContent = `Live: Kamera ${kamera}`;
-                liveIndicator.classList.add("active");
-            } else {
-                liveIndicator.textContent = "Live: keine Kamera";
-                liveIndicator.classList.remove("active");
-            }
-            document.body.classList.toggle("live-match", Boolean(kamera));
-        };
-
+        // Modal + cameras
         const openEditor = (index) => {
-            editingIndex = index;
-            const cam = cameraData[index];
-            modalTitle.textContent = `Kamera ${cam.id} bearbeiten`;
-            nameInput.value = cam.name;
-            tallyInput.value = cam.tally;
-            populateTallySelect();
-            tallySelect.value = tallySelect.querySelector(`option[value="${cam.tally}"]`) ? cam.tally : "";
+            state.editingIndex = index;
+            const cam = state.cameraData[index];
+            el.modalTitle.textContent = `Kamera ${cam.id} bearbeiten`;
+            el.nameInput.value = cam.name;
+            el.tallyInput.value = cam.tally;
             updateTestButton();
-            modal.classList.add("modal--open");
-            nameInput.focus();
+            el.modal.classList.add("modal--open");
+            el.nameInput.focus();
         };
 
         const closeEditor = () => {
-            editingIndex = null;
-            modal.classList.remove("modal--open");
+            state.editingIndex = null;
+            el.modal.classList.remove("modal--open");
         };
 
         const autoSave = () => {
-            if (!initialSyncComplete) return;
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
+            clearTimeout(state.saveTimeout);
+            state.saveTimeout = setTimeout(() => {
                 sendeListe();
             }, 250);
         };
 
         const updateTestButton = () => {
-            testButton.disabled = !(tallyInput.value.trim());
-        };
-
-        const populateTallySelect = () => {
-            tallySelect.innerHTML = `<option value="">Aus Liste wählen …</option>`;
-            const unique = [...new Set(tallyPool)].filter(Boolean);
-            unique.forEach((tally) => {
-                const option = document.createElement("option");
-                option.value = tally;
-                option.textContent = tally;
-                tallySelect.appendChild(option);
-            });
+            el.testButton.disabled = !(el.tallyInput.value.trim());
         };
 
         const assignTallyToCamera = (cameraIndex, tally) => {
-            const cam = cameraData[cameraIndex];
+            const cam = state.cameraData[cameraIndex];
             if (!cam || !tally) return;
             cam.tally = tally;
             renderGrid();
@@ -597,148 +868,206 @@
             autoSave();
         };
 
-        cameraGrid.addEventListener("click", (event) => {
+        // Events
+        el.cameraGrid.addEventListener("click", (event) => {
             const tile = event.target.closest(".tile");
             if (!tile) return;
-            const index = Number(tile.dataset.index);
-            openEditor(index);
+            openEditor(Number(tile.dataset.index));
         });
 
-        const handleDragStart = (event) => {
+        el.tallyBank.addEventListener("dragstart", (event) => {
             const pill = event.target.closest(".tally-pill");
             if (!pill || !pill.draggable) return;
             event.dataTransfer.setData("text/plain", pill.dataset.tally);
             pill.classList.add("dragging");
-        };
+        });
 
-        const handleDragEnd = (event) => {
+        el.tallyBank.addEventListener("dragend", (event) => {
             const pill = event.target.closest(".tally-pill");
             if (pill) pill.classList.remove("dragging");
-        };
+        });
 
-        tallyBankEl.addEventListener("dragstart", handleDragStart);
-        tallyBankEl.addEventListener("dragend", handleDragEnd);
-
-        cameraGrid.addEventListener("dragover", (event) => {
+        el.cameraGrid.addEventListener("dragover", (event) => {
             event.preventDefault();
             const tile = event.target.closest(".tile");
             if (!tile) return;
             tile.classList.add("drag-over");
         });
 
-        cameraGrid.addEventListener("dragleave", (event) => {
+        el.cameraGrid.addEventListener("dragleave", (event) => {
             const tile = event.target.closest(".tile");
             if (!tile) return;
             tile.classList.remove("drag-over");
         });
 
-        cameraGrid.addEventListener("drop", (event) => {
+        el.cameraGrid.addEventListener("drop", (event) => {
             event.preventDefault();
             const tile = event.target.closest(".tile");
             if (!tile) return;
             tile.classList.remove("drag-over");
             const tally = event.dataTransfer.getData("text/plain");
-            const index = Number(tile.dataset.index);
-            assignTallyToCamera(index, tally);
+            assignTallyToCamera(Number(tile.dataset.index), tally);
         });
 
-        modal.addEventListener("click", (event) => {
-            if (event.target === modal) {
-                closeEditor();
-            }
+        el.modal.addEventListener("click", (event) => {
+            if (event.target === el.modal) closeEditor();
         });
 
-        modalCloseBtn.addEventListener("click", closeEditor);
-        closeButton.addEventListener("click", closeEditor);
+        el.modalCloseBtn.addEventListener("click", closeEditor);
+        el.closeButton.addEventListener("click", closeEditor);
 
-        nameInput.addEventListener("input", () => {
-            if (editingIndex === null) return;
-            const cam = cameraData[editingIndex];
-            cam.name = nameInput.value;
+        el.nameInput.addEventListener("input", () => {
+            if (state.editingIndex === null) return;
+            const cam = state.cameraData[state.editingIndex];
+            const value = el.nameInput.value.trim();
+            cam.name = value || `Kamera ${cam.id}`;
+            el.nameInput.value = cam.name;
             renderGrid();
             autoSave();
         });
 
-        tallyInput.addEventListener("input", () => {
-            if (editingIndex === null) return;
-            const cam = cameraData[editingIndex];
-            cam.tally = tallyInput.value.trim().toUpperCase();
-            tallyInput.value = cam.tally;
-            if (tallySelect.value !== cam.tally) {
-                tallySelect.value = "";
-            }
+        el.tallyInput.addEventListener("input", () => {
+            if (state.editingIndex === null) return;
+            const cam = state.cameraData[state.editingIndex];
+            cam.tally = el.tallyInput.value.trim().toUpperCase();
+            el.tallyInput.value = cam.tally;
             renderGrid();
             updateTestButton();
             autoSave();
         });
 
-        tallySelect.addEventListener("change", () => {
-            if (editingIndex === null) return;
-            const value = tallySelect.value;
-            const cam = cameraData[editingIndex];
-            cam.tally = value;
-            tallyInput.value = value;
-            renderGrid();
-            updateTestButton();
-            autoSave();
-        });
-
-        testButton.addEventListener("click", () => {
-            if (editingIndex === null) return;
-            const tally = cameraData[editingIndex].tally;
+        el.testButton.addEventListener("click", () => {
+            if (state.editingIndex === null) return;
+            const tally = state.cameraData[state.editingIndex].tally;
             if (!tally) return;
             markLight(tally);
             triggerCooldown();
         });
 
-        socket.on("Update", (data) => {
-            kamera = Number(data?.Kamera) || 0;
-            applyServerData(data?.Liste);
-            camList = data?.Liste;
-            tallyPool = data?.Pool || tallyPool;
-            renderGrid();
-            renderTallyBank();
-            populateTallySelect();
-            updateLiveIndicator();
-            initialSyncComplete = true;
+        el.chatForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const text = el.chatInput.value.trim();
+            if (!text) return;
+            const time = Math.floor(Date.now() / 1000);
+            //appendChatMessage({ author: "Admin", text, time, self: true });
+            el.chatInput.value = "";
+            const recipients = buildRecipientsPayload();
+            nachricht = recipients  + ": " +  text
+            sendChatMessage({ author: "Admin", recipients, text, time });
+            closeMenu();
         });
 
+        el.chatSendButton.addEventListener("click", (event) => {
+            const rect = el.chatSendButton.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const openMenu = clickX >= rect.width * 0.75;
+            if (openMenu) {
+                event.preventDefault();
+                toggleMenu();
+            }
+        });
+
+        document.addEventListener("click", (event) => {
+            if (!el.chatMenu || !el.chatSendButton) return;
+            if (el.chatMenu.contains(event.target) || el.chatSendButton.contains(event.target)) return;
+            closeMenu();
+        });
+
+        socket.on("connect", () => setChatStatus(true));
+        socket.on("disconnect", () => setChatStatus(false));
+
+        socket.on("chat", (data) => {
+            if (typeof data === "string") {
+                try {
+                    data = JSON.parse(data);
+                } catch (error) {
+                    data = {};
+                }
+            }
+            console.log(data);
+            
+            appendChatMessage({
+                author: data?.author || "Raspi",
+                text: data?.text || "",
+                time: data?.time || Date.now()
+            });
+        });
+
+        socket.on("chat_history", (history) => {
+            if (!Array.isArray(history)) return;
+            state.chatLog = history
+                .map((entry) => ({
+                    author: entry?.author || "Unbekannt",
+                    text: entry?.text || "",
+                    time: entry?.time || Date.now(),
+                    self: entry?.self || false
+                }))
+                .filter((entry) => entry.text);
+            renderChatMessages();
+        });
+
+        socket.on("Update", (data) => {
+            state.kamera = Number(data?.Kamera) || 0;
+            applyServerData(data?.Liste);
+            state.tallyPool = data?.TallyPool || state.tallyPool;
+            renderGrid();
+            renderTallyBank();
+            updateLiveIndicator();
+        });
+
+        // Chat menu helpers
+        const toggleMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.classList.toggle("chat-menu--open");
+            el.chatMenu.setAttribute("aria-hidden", el.chatMenu.classList.contains("chat-menu--open") ? "false" : "true");
+        };
+
+        const closeMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.classList.remove("chat-menu--open");
+            el.chatMenu.setAttribute("aria-hidden", "true");
+        };
+
+        // Init
         renderGrid();
         renderTallyBank();
-        populateTallySelect();
         updateLiveIndicator();
-        
+        renderChatMessages();
+        setChatStatus(socket.connected);
+        updateSendLabel();
+        renderRecipientMenu();
 
+        // Other utilities
         const triggerCooldown = () => {
-            clearTimeout(cooldownTimeout);
-            testButton.disabled = true;
-            cooldownBar.style.transition = "none";
-            cooldownBar.style.transform = "scaleX(1)";
-            cooldownBar.style.opacity = "1";
+            clearTimeout(state.cooldownTimeout);
+            el.testButton.disabled = true;
+            el.cooldownBar.style.transition = "none";
+            el.cooldownBar.style.transform = "scaleX(1)";
+            el.cooldownBar.style.opacity = "1";
             requestAnimationFrame(() => {
-                cooldownBar.style.transition = "transform 2s linear, opacity 0.3s ease 1.7s";
-                cooldownBar.style.transform = "scaleX(0)";
-                cooldownBar.style.opacity = "0";
+                el.cooldownBar.style.transition = "transform 2s linear, opacity 0.3s ease 1.7s";
+                el.cooldownBar.style.transform = "scaleX(0)";
+                el.cooldownBar.style.opacity = "0";
             });
-            cooldownTimeout = setTimeout(() => {
+            state.cooldownTimeout = setTimeout(() => {
                 updateTestButton();
             }, 2000);
         };
 
         function sendeListe() {
-            const payload = Array(CAMERA_COUNT + 1).fill(null);
-            cameraData.forEach((cam) => {
+            const payload = Array(state.CAMERA_COUNT + 1).fill(null);
+            state.cameraData.forEach((cam) => {
                 payload[cam.id] = { name: cam.name, tally: cam.tally };
             });
-            console.log(initialSyncComplete)
-            if (initialSyncComplete){
-                socket.emit("admin_command", { cameras: payload, tallyPool });
-                console.log("Ich sende jetzt")
-            }
+            socket.emit("admin_command", { cameras: payload, tallyPool: state.tallyPool });
         }
 
         function markLight(light) {
             socket.emit("markLight", light);
+        }
+
+        function sendChatMessage({ author, recipients, text, time }) {
+            socket.emit("chat", { author, recipients, text, time });
         }
     </script>
 </body>

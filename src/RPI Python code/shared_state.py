@@ -2,6 +2,8 @@ import json
 from multiprocessing import Manager
 import os
 
+
+
 CONFIG_FILE = "tally/newLaxoutV1/config/config.json"
 
 def load_state():
@@ -68,5 +70,6 @@ def set_Pool(pool):
 
 def get_Pool():
     return state["TallyPool"]
+
 
 print("Liste:   ", get_Liste())

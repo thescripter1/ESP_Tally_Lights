@@ -4,7 +4,7 @@
 
 #include <FastLED.h>
 
-#define LED_PIN D4
+#define LED_PIN D5
 #define NUM_LEDS 4
 #define BRIGHTNESS 5
 #define LED_TYPE WS2812B
@@ -16,7 +16,7 @@ const unsigned long heartbeatInterval = 10000; // 10 Sekunden
 CRGB leds[NUM_LEDS];
 uint8_t gHue = 0; // Globale Farbabstufung (Hue)
 
-#define character "A"
+#define character "C"
 
 
 // 🔧 Deine WLAN-Daten
@@ -63,27 +63,35 @@ void setup_wifi() {
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  if(length == 0) return; // Sicherheit
-  
-  // Nur das erste Byte interpretieren
-  char val = (char)payload[0];
-  Serial.println(val);
-
-  switch(val) {
-    case '0': fill_solid(leds, NUM_LEDS, CRGB::Black); break;
-    case '1': fill_solid(leds, NUM_LEDS, CRGB(255,0,0)); break;
-    case '5': fill_solid(leds, NUM_LEDS, CRGB(255,0,255)); break;
-    default: return; // unbekannter Code
+  // Payload in String wandeln
+  String msg;
+  for (unsigned int i = 0; i < length; i++) {
+    msg += (char)payload[i];
   }
-  FastLED.show();
+  msg.trim(); // Leerzeichen entfernen
+  Serial.print("Empfangen: ");
+  Serial.println(msg);
+
+  // 🎨 HEX-Farbcode? (#RRGGBB oder RRGGBB)
+  if (msg.startsWith("#")) msg = msg.substring(1);
+  if (msg.length() == 6) {
+    long number = strtol(msg.c_str(), NULL, 16);
+    uint8_t r = (number >> 16) & 0xFF;
+    uint8_t g = (number >> 8) & 0xFF;
+    uint8_t b = number & 0xFF;
+
+    //fill_solid(leds, NUM_LEDS, CRGB(255, 0, 255));
+    fill_solid(leds, NUM_LEDS, CRGB(r, g, b));
+    FastLED.show();
+  }
 }
 
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Verbindung zu MQTT Broker...");
-    if (client.connect("D1MiniTallyA")) {
+    if (client.connect((String("D1MiniTally") + character).c_str())) { // Korrigiert
       Serial.println("Verbunden!");
-      client.subscribe("tally/lights/A");
+      client.subscribe(topic.c_str()); // Korrigiert
     } else {
       Serial.print("Fehler, rc=");
       Serial.print(client.state());
@@ -94,13 +102,13 @@ void reconnect() {
 }
 
 void setup() {
-
+  Serial.begin(115200);
   Serial.println(topic);  // Ausgabe: tally/lights/C
 
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(BRIGHTNESS);
 
-  Serial.begin(115200);
+  
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);

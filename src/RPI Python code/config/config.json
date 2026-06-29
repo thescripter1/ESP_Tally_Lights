@@ -51,6 +51,10 @@
         "admin_port": 4321,
         "client_host": "0.0.0.0",
         "client_port": 1234,
-        "camera_count": 8
+        "camera_count": 8,
+        "program_color": "#ff0000",
+        "preview_color": "#00ff00",
+        "off_color": "#000000",
+        "identify_color": "#c832c8"
     }
 }

@@ -102,7 +102,11 @@ The Raspberry Pi server reads runtime settings from `src/RPI Python code/config/
     "admin_port": 4321,
     "client_host": "0.0.0.0",
     "client_port": 1234,
-    "camera_count": 8
+    "camera_count": 8,
+    "program_color": "#ff0000",
+    "preview_color": "#00ff00",
+    "off_color": "#000000",
+    "identify_color": "#c832c8"
   }
 }
 ```
@@ -119,6 +123,10 @@ Supported environment overrides:
 | `TALLY_CLIENT_HOST` | Client dashboard bind address |
 | `TALLY_CLIENT_PORT` | Client dashboard port |
 | `TALLY_CAMERA_COUNT` | Default number of cameras when no saved camera list exists |
+| `TALLY_PROGRAM_COLOR` | Color for the active Program camera |
+| `TALLY_PREVIEW_COLOR` | Color for the active Preview camera |
+| `TALLY_OFF_COLOR` | Color for assigned cameras that are neither Program nor Preview |
+| `TALLY_IDENTIFY_COLOR` | Temporary color used by the admin identify/test action |
 
 Missing values fall back to the documented defaults. Invalid numeric values print a warning and fall back to the safe default for that setting.
 
@@ -424,10 +432,13 @@ Adjust these values to match your hardware.
 The ESP firmware accepts six-digit hex colors:
 
 ```text
-#ff0000  red/live
-#000000  off
-#c832c8  purple identify/mark light
+#ff0000  Program/live by default
+#00ff00  Preview/next by default
+#000000  Off by default
+#c832c8  Identify/mark light by default
 ```
+
+When a camera is both Program and Preview, Program has priority. The Raspberry Pi server only sends a new MQTT color command when the target color for a tally light changes.
 
 Topics:
 

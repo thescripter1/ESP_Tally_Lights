@@ -15,6 +15,10 @@ DEFAULT_SETTINGS = {
     "client_host": "0.0.0.0",
     "client_port": 1234,
     "camera_count": 8,
+    "program_color": "#ff0000",
+    "preview_color": "#00ff00",
+    "off_color": "#000000",
+    "identify_color": "#c832c8",
 }
 
 ENV_OVERRIDES = {
@@ -26,6 +30,10 @@ ENV_OVERRIDES = {
     "TALLY_CLIENT_HOST": "client_host",
     "TALLY_CLIENT_PORT": "client_port",
     "TALLY_CAMERA_COUNT": "camera_count",
+    "TALLY_PROGRAM_COLOR": "program_color",
+    "TALLY_PREVIEW_COLOR": "preview_color",
+    "TALLY_OFF_COLOR": "off_color",
+    "TALLY_IDENTIFY_COLOR": "identify_color",
 }
 
 INT_FIELDS = {"mqtt_port", "admin_port", "client_port", "camera_count"}
@@ -95,4 +103,3 @@ def load_settings():
 
 
 SETTINGS = load_settings()
-

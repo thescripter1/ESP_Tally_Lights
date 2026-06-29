@@ -3,7 +3,8 @@
 A DIY wireless tally light system for Blackmagic ATEM video switchers. A Raspberry Pi reads the current program input from the ATEM, publishes tally states over MQTT, and ESP8266-based tally lights subscribe to their assigned MQTT topics.
 
 > [!WARNING]
-> Some code and variable names are still German, and a few IP addresses are currently hardcoded. The documentation below describes the project as it exists today.
+> [!NOTE]
+> Some code and variable names are still German. Runtime network and service settings are configured through `config/config.json` or environment variables.
 
 ![ESP Tally Light](https://github.com/user-attachments/assets/def7a56f-405d-4a1b-bcd7-a389e9b9be46)
 
@@ -85,7 +86,41 @@ These values are used by the current code and examples:
 | Admin dashboard | `http://192.168.4.1:4321` |
 | Client dashboard | `http://192.168.4.1:1234` |
 
-Change the matching values in the Python and Arduino files if your network uses different addresses.
+Change Raspberry Pi server values in `src/RPI Python code/config/config.json` if your network uses different addresses. ESP firmware Wi-Fi and MQTT values are still compile-time settings in the Arduino sketch.
+
+## Server Configuration
+
+The Raspberry Pi server reads runtime settings from `src/RPI Python code/config/config.json`. Existing camera and tally assignments are stored in the same file, while server settings live under `Settings`:
+
+```json
+{
+  "Settings": {
+    "atem_ip": "192.168.2.10",
+    "mqtt_host": "127.0.0.1",
+    "mqtt_port": 1883,
+    "admin_host": "0.0.0.0",
+    "admin_port": 4321,
+    "client_host": "0.0.0.0",
+    "client_port": 1234,
+    "camera_count": 8
+  }
+}
+```
+
+Supported environment overrides:
+
+| Environment variable | Setting |
+| --- | --- |
+| `TALLY_ATEM_IP` | ATEM switcher IP |
+| `TALLY_MQTT_HOST` | MQTT broker host used by the Python server |
+| `TALLY_MQTT_PORT` | MQTT broker port |
+| `TALLY_ADMIN_HOST` | Admin dashboard bind address |
+| `TALLY_ADMIN_PORT` | Admin dashboard port |
+| `TALLY_CLIENT_HOST` | Client dashboard bind address |
+| `TALLY_CLIENT_PORT` | Client dashboard port |
+| `TALLY_CAMERA_COUNT` | Default number of cameras when no saved camera list exists |
+
+Missing values fall back to the documented defaults. Invalid numeric values print a warning and fall back to the safe default for that setting.
 
 ## Raspberry Pi Setup
 
@@ -260,7 +295,7 @@ mosquitto_pub -h 127.0.0.1 -t "tally/lights/A" -m "#ff0000"
 
 ## Ethernet Setup for the ATEM
 
-The current Python code connects to the ATEM at `192.168.2.10`. The documented Pi Ethernet address is `192.168.2.11/24`.
+By default, the Python server connects to the ATEM at `192.168.2.10`. Set `Settings.atem_ip` or `TALLY_ATEM_IP` when your switcher uses another address. The documented Pi Ethernet address is `192.168.2.11/24`.
 
 On Raspberry Pi OS images using NetworkManager, list connections:
 
@@ -296,11 +331,11 @@ cd ~
 python3 ~/tally-lights-server/main.py
 ```
 
-The server starts three components:
+The server starts three components using the values from `config/config.json`:
 
 - Admin dashboard: `http://192.168.4.1:4321`
 - Client dashboard: `http://192.168.4.1:1234`
-- ATEM listener, connecting to `192.168.2.10`
+- ATEM listener, connecting to `Settings.atem_ip`
 
 Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers.
 
@@ -451,7 +486,7 @@ Check that the ATEM is reachable from the Pi:
 ping 192.168.2.10
 ```
 
-If your ATEM uses another IP address, update it in `src/RPI Python code/ATEM.py`.
+If your ATEM uses another IP address, update `Settings.atem_ip` in `src/RPI Python code/config/config.json` or set `TALLY_ATEM_IP`.
 
 ### The Python server cannot find the config or chat file
 

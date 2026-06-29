@@ -2,6 +2,7 @@ import time
 import random
 from shared_state import set_Kamera
 from tally import makeRed, makeDark, disconnect_Tally
+from settings import SETTINGS
 import PyATEMMax
 
 current_input = random.randint(1, 8)
@@ -41,7 +42,7 @@ class ReadAtem:
     def __init__():
         #ATEM Switcher Konfigurieren
         switcher = PyATEMMax.ATEMMax()
-        switcher.connect("192.168.2.10")
+        switcher.connect(SETTINGS["atem_ip"])
         switcher.waitForConnection()"""
 
 def run2():

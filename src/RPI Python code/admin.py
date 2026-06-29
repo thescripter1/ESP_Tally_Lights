@@ -5,6 +5,7 @@ import threading
 import time
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool
 from tally import makeLila
+from settings import SETTINGS
 
 from chat import save_message, get_latest_message
 
@@ -66,4 +67,4 @@ def _watcher():
 def run():
     _register_routes()
     threading.Thread(target=_watcher, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=4321)
+    socketio.run(app, host=SETTINGS["admin_host"], port=SETTINGS["admin_port"])

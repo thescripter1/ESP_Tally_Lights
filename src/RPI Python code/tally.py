@@ -1,9 +1,10 @@
 import time
 import paho.mqtt.client as mqtt
 from shared_state import get_Liste, set_Pool
+from settings import SETTINGS
 
 
-broker = "127.0.0.1"
+broker = SETTINGS["mqtt_host"]
 client = mqtt.Client()
 
 connected_devices = set()
@@ -14,7 +15,7 @@ def on_message(client, userdata, msg):
     set_Pool(list(connected_devices))
 
 client.on_message = on_message
-client.connect(broker, 1883, 60)
+client.connect(broker, SETTINGS["mqtt_port"], 60)
 client.subscribe("tally/lights/status")
 client.loop_start()
 

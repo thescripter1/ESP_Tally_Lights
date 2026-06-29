@@ -449,6 +449,12 @@ Topics:
 
 The admin dashboard uses the heartbeat topic to show available tally lights.
 
+## Runtime Resilience
+
+The Raspberry Pi server reconnects to MQTT automatically and subscribes to the tally light heartbeat topic again after reconnect. The ATEM listener also retries after connection loss or switcher reboot without requiring a Python server restart.
+
+ESP tally lights send a heartbeat every 10 seconds. The admin dashboard marks a light offline when no heartbeat has been received for 30 seconds. When Wi-Fi or MQTT comes back, ESP lights reconnect and resubscribe to their `tally/lights/<ID>` topic.
+
 ## Dashboards
 
 Connect a device to the `Tally-Lights` Wi-Fi network and open:

@@ -8,16 +8,40 @@ broker = SETTINGS["mqtt_host"]
 client = mqtt.Client()
 
 connected_devices = set()
+device_last_seen = {}
 last_light_colors = {}
+DEVICE_TIMEOUT_SECONDS = 30
+
+
+def on_connect(client, userdata, flags, rc, *args):
+    if rc == 0:
+        print(f"MQTT verbunden: {broker}:{SETTINGS['mqtt_port']}")
+        client.subscribe("tally/lights/status")
+    else:
+        print(f"MQTT Verbindung fehlgeschlagen, rc={rc}")
+
+
+def on_disconnect(client, userdata, rc, *args):
+    if rc != 0:
+        print("MQTT Verbindung verloren. Versuche automatisch erneut zu verbinden.")
+    else:
+        print("MQTT Verbindung getrennt.")
+
 
 def on_message(client, userdata, msg):
-    device_id = msg.payload.decode() 
+    device_id = msg.payload.decode().strip()
+    if not device_id:
+        return
     connected_devices.add(device_id)
+    device_last_seen[device_id] = time.time()
     set_Pool(list(connected_devices))
 
+
 client.on_message = on_message
-client.connect(broker, SETTINGS["mqtt_port"], 60)
-client.subscribe("tally/lights/status")
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
+client.reconnect_delay_set(min_delay=1, max_delay=30)
+client.connect_async(broker, SETTINGS["mqtt_port"], 60)
 client.loop_start()
 
 
@@ -42,9 +66,15 @@ def _publish_light(char, code, force=False):
     if not force and last_light_colors.get(address) == code:
         return
 
-    client.publish(address, code)
-    last_light_colors[address] = code
-    print("Sende Code", code, "an", address)
+    try:
+        result = client.publish(address, code)
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            last_light_colors[address] = code
+            print("Sende Code", code, "an", address)
+        else:
+            print(f"MQTT Publish an {address} konnte nicht direkt gesendet werden, rc={result.rc}")
+    except Exception as error:
+        print(f"MQTT Publish an {address} fehlgeschlagen: {error}")
 
 
 def make_light(Kameranummer, code, force=False):
@@ -94,12 +124,23 @@ def makeLila(char):
     adress = f"tally/lights/{char}"
     _publish_light(char, SETTINGS["identify_color"], force=True)
     time.sleep(2)
-    client.publish(adress, SETTINGS["off_color"])
-    last_light_colors[adress] = SETTINGS["off_color"]
+    _publish_light(char, SETTINGS["off_color"], force=True)
 
 def make_Farbe(char, farbe):
     _publish_light(char, farbe, force=True)
 
 def disconnect_Tally():
     client.disconnect()
-    
+
+
+def get_device_statuses():
+    now = time.time()
+    statuses = []
+    for device_id in sorted(connected_devices):
+        last_seen = device_last_seen.get(device_id, 0)
+        statuses.append({
+            "id": device_id,
+            "online": now - last_seen <= DEVICE_TIMEOUT_SECONDS,
+            "lastSeen": last_seen,
+        })
+    return statuses

@@ -12,6 +12,8 @@
 
 unsigned long lastHeartbeat = 0;       // Zeitpunkt der letzten Nachricht
 const unsigned long heartbeatInterval = 10000; // 10 Sekunden
+unsigned long lastWifiReconnectAttempt = 0;
+const unsigned long wifiReconnectInterval = 5000;
 
 CRGB leds[NUM_LEDS];
 uint8_t gHue = 0; // Globale Farbabstufung (Hue)
@@ -38,6 +40,9 @@ String topic = String("tally/lights/") + character;
 
 void setup_wifi() {
   delay(10);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   Serial.println();
   Serial.print("Verbinde mit WLAN: ");
   Serial.println(ssid);
@@ -60,6 +65,24 @@ void setup_wifi() {
   FastLED.show();
   Serial.println("IP-Adresse: ");
   Serial.println(WiFi.localIP());
+}
+
+bool ensure_wifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
+
+  unsigned long now = millis();
+  if (now - lastWifiReconnectAttempt > wifiReconnectInterval) {
+    lastWifiReconnectAttempt = now;
+    Serial.println("WLAN getrennt, versuche Reconnect...");
+    WiFi.disconnect();
+    WiFi.begin(ssid, password);
+  }
+
+  fill_solid(leds, NUM_LEDS, CRGB(0, 0, 255));
+  FastLED.show();
+  return false;
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -115,6 +138,11 @@ void setup() {
 }
 
 void loop() {
+  if (!ensure_wifi()) {
+    delay(100);
+    return;
+  }
+
   if (!client.connected()) {
     reconnect();
   }

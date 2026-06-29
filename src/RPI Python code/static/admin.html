@@ -210,6 +210,26 @@
             transform: scale(1.05);
         }
 
+        .tally-pill--offline {
+            opacity: 0.55;
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tally-status {
+            display: inline-block;
+            width: 0.55rem;
+            height: 0.55rem;
+            margin-right: 0.45rem;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .tally-status--online {
+            background: var(--success);
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
+        }
+
         .tile.drag-over {
             border-color: rgba(96, 165, 250, 0.7);
             box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
@@ -637,6 +657,7 @@
             saveTimeout: null,
             cooldownTimeout: null,
             tallyPool: [],
+            devices: [],
             chatLog: [],
             recipients: ["all"]
         };
@@ -704,11 +725,15 @@
                 return;
             }
             state.tallyPool.forEach((tally) => {
+                const device = state.devices.find((item) => item.id === tally);
+                const online = device ? device.online : false;
                 const pill = document.createElement("div");
-                pill.className = "tally-pill";
-                pill.textContent = tally;
-                pill.draggable = true;
+                pill.className = `tally-pill${online ? "" : " tally-pill--offline"}`;
+                pill.draggable = online;
                 pill.dataset.tally = tally;
+                const dot = document.createElement("span");
+                dot.className = `tally-status${online ? " tally-status--online" : ""}`;
+                pill.append(dot, document.createTextNode(`${tally} ${online ? "online" : "offline"}`));
                 el.tallyBank.appendChild(pill);
             });
         };
@@ -1009,7 +1034,8 @@
         socket.on("Update", (data) => {
             state.kamera = Number(data?.Kamera) || 0;
             applyServerData(data?.Liste);
-            state.tallyPool = data?.TallyPool || state.tallyPool;
+            state.tallyPool = data?.Pool || data?.TallyPool || state.tallyPool;
+            state.devices = Array.isArray(data?.Devices) ? data.Devices : state.devices;
             renderGrid();
             renderTallyBank();
             updateLiveIndicator();

@@ -40,10 +40,13 @@ def load_state():
 
 
 def save_state(state_dict):
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    state_dict["Settings"] = SETTINGS
-    with CONFIG_FILE.open("w", encoding="utf-8") as file:
-        json.dump(state_dict, file, indent=4)
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        state_dict["Settings"] = SETTINGS
+        with CONFIG_FILE.open("w", encoding="utf-8") as file:
+            json.dump(state_dict, file, indent=4)
+    except OSError as error:
+        print(f"Warnung: config.json konnte nicht gespeichert werden: {error}")
 
 
 manager = Manager()
@@ -81,4 +84,3 @@ def get_Pool():
 
 
 print("Liste:   ", get_Liste())
-

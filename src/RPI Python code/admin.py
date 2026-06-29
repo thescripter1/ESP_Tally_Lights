@@ -4,7 +4,7 @@ from pathlib import Path
 import threading
 import time
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool
-from tally import makeLila
+from tally import makeLila, get_device_statuses
 from settings import SETTINGS
 
 from chat import save_message, get_latest_message
@@ -17,6 +17,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 lastKamera = None
 lastListe = None
 lastPool = None
+lastDevices = None
 last_message = None
 
 
@@ -40,22 +41,24 @@ def _register_routes():
 
 
 def _watcher():
-    global lastKamera, lastListe, lastPool, last_message
+    global lastKamera, lastListe, lastPool, lastDevices, last_message
 
     while True:
         Kamera = get_Kamera()
         Liste = get_Liste()
         Pool = get_Pool()
+        Devices = get_device_statuses()
         message = get_latest_message()
 
-        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool:
+        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool or Devices != lastDevices:
             socketio.emit(
                 "Update",
-                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool}
+                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool, "Devices": Devices}
             )
             lastKamera = Kamera
             lastListe = Liste
             lastPool = Pool
+            lastDevices = Devices
 
         if  message != last_message:
             socketio.emit("chat", message)

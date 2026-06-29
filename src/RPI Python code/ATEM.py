@@ -1,7 +1,7 @@
 import time
 import random
 from shared_state import set_Kamera
-from tally import makeRed, makeDark, disconnect_Tally, update_tally_states
+from tally import makeDark, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
 
@@ -47,17 +47,16 @@ class ReadAtem:
         switcher.waitForConnection()"""
 
 def run2():
-    try:
-        print("Versuche verbindung mit ATEM")
-        #ATEM Switcher Konfigurieren
+    reconnect_delay = 3
+
+    while True:
         switcher = PyATEMMax.ATEMMax()
-        switcher.connect("192.168.2.10")
-        switcher.waitForConnection()
-        print("ATEM verbindung hergestellt")
-    except Exception as e:
-        print("Fehler:", e)
-    finally:
         try:
+            print(f"Versuche Verbindung mit ATEM {SETTINGS['atem_ip']}")
+            switcher.connect(SETTINGS["atem_ip"])
+            switcher.waitForConnection()
+            print("ATEM Verbindung hergestellt")
+
             max_camera = SETTINGS["camera_count"]
             last_program = switcher.programInput[0].videoSource.value
             last_preview = switcher.previewInput[0].videoSource.value
@@ -77,7 +76,13 @@ def run2():
                     last_program = program_src
                     last_preview = preview_src
 
-                time.sleep(0.01)
+                time.sleep(0.05)
+        except Exception as error:
+            print(f"ATEM Verbindung verloren oder fehlgeschlagen: {error}")
         finally:
-            disconnect_Tally()
-            print("Verbindung getrennt.")
+            try:
+                switcher.disconnect()
+            except Exception:
+                pass
+            print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
+            time.sleep(reconnect_delay)

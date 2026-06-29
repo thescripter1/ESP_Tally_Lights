@@ -136,6 +136,34 @@ The project was tested on a Raspberry Pi 3B with Raspberry Pi OS Lite. When imag
 
 Connect to the Pi via Ethernet/SSH for the initial setup.
 
+### Quick Server Install
+
+Clone the repository and run the installer:
+
+```bash
+git clone https://github.com/thescripter1/ESP_Tally_Lights.git ~/ESP_Tally_Lights
+cd ~/ESP_Tally_Lights
+./scripts/install_rpi.sh
+```
+
+The script installs apt/Python dependencies, copies the Python server to `~/tally-lights-server`, creates runtime folders, installs a `tally-lights.service` systemd unit, enables it, starts Mosquitto, and restarts the tally server. It is safe to re-run; existing `config/config.json` remains in the server directory and is reused.
+
+Override the install target or service name if needed:
+
+```bash
+SERVER_DIR=/opt/tally-lights-server SERVICE_NAME=tally-lights ./scripts/install_rpi.sh
+```
+
+After installation:
+
+```bash
+sudo systemctl status tally-lights
+```
+
+Then continue with the Wi-Fi access point and Ethernet setup sections below if the Pi network has not been configured yet.
+
+### Manual Install
+
 ### 1. Update the System
 
 ```bash

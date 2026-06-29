@@ -5,8 +5,6 @@ A DIY wireless tally light system for Blackmagic ATEM video switchers. A Raspber
 > [!WARNING]
 > Some code and variable names are still German, and a few IP addresses are currently hardcoded. The documentation below describes the project as it exists today.
 
-![ESP Tally Light](https://github.com/user-attachments/assets/def7a56f-405d-4a1b-bcd7-a389e9b9be46)
-
 ## What It Does
 
 - Reads the active program input from a Blackmagic ATEM switcher.

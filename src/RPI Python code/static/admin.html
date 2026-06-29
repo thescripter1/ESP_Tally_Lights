@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tally Lights Admin</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #020409;
+            --bg-accent: #0c1325;
+            --panel: rgba(14, 20, 35, 0.85);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --panel-shadow: 0 25px 70px rgba(4, 9, 20, 0.55);
+            --tile: rgba(255, 255, 255, 0.04);
+            --tile-hover: rgba(255, 255, 255, 0.09);
+            --tile-live: linear-gradient(135deg, rgba(248, 113, 113, 0.4), rgba(244, 63, 94, 0.2));
+            --text: #f8fafc;
+            --muted: #aab3cc;
+            --accent: #60a5fa;
+            --accent-strong: #2563eb;
+            --success: #34d399;
+            --danger: #fb7185;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 3rem 1.5rem 4rem;
+            display: flex;
+            justify-content: center;
+            background: radial-gradient(circle at 15% 20%, rgba(96, 165, 250, 0.15), transparent 35%), radial-gradient(circle at 80% 0%, rgba(248, 113, 113, 0.15), transparent 30%), linear-gradient(135deg, var(--bg-accent), var(--bg));
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            transition: background 0.4s ease;
+        }
+
+        body.live-match {
+            background: radial-gradient(circle at 20% 25%, rgba(251, 113, 133, 0.25), transparent 40%), radial-gradient(circle at 75% -5%, rgba(96, 165, 250, 0.18), transparent 35%), linear-gradient(135deg, #14050b, #050308 65%, #0b1022);
+        }
+
+        .admin-app {
+            width: min(1200px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+        }
+
+        header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.9rem, 4vw, 2.7rem);
+            letter-spacing: 0.02em;
+        }
+
+        .subline {
+            margin: 0.4rem 0 0;
+            color: var(--muted);
+        }
+
+        .status-pill {
+            padding: 0.65rem 1.15rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .status-pill::before {
+            content: "";
+            width: 0.65rem;
+            height: 0.65rem;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        .status-pill.active {
+            color: var(--text);
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .status-pill.active::before {
+            background: var(--success);
+            box-shadow: 0 0 12px rgba(52, 211, 153, 0.6);
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            padding: 2rem;
+            box-shadow: var(--panel-shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 1.1rem;
+        }
+
+        .tile {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 1.4rem;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.5rem;
+            background: var(--tile);
+            cursor: pointer;
+            transition: transform 0.25s ease, border 0.25s ease, background 0.25s ease;
+        }
+
+        .tile::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            background: radial-gradient(circle at top, rgba(255, 255, 255, 0.35), transparent 55%);
+        }
+
+        .tile:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.25);
+            background: var(--tile-hover);
+        }
+
+        .tile:hover::after {
+            opacity: 1;
+        }
+
+        .tile.live {
+            background: var(--tile-live);
+            border-color: rgba(248, 113, 113, 0.6);
+            box-shadow: 0 18px 35px rgba(248, 113, 113, 0.35);
+        }
+
+        .tile-id {
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .tile-name {
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: var(--text);
+        }
+
+        .tile-sub {
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .list-chat-card h2 {
+            margin: 0 0 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .tally-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .tally-pill {
+            padding: 0.6rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(96, 165, 250, 0.1);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            letter-spacing: 0.06em;
+            font-size: 0.9rem;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .tally-pill:active {
+            cursor: grabbing;
+        }
+
+        .tally-pill.dragging {
+            opacity: 0.7;
+            transform: scale(1.05);
+        }
+
+        .tile.drag-over {
+            border-color: rgba(96, 165, 250, 0.7);
+            box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+        }
+
+        footer {
+            text-align: right;
+            color: var(--muted);
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 4, 9, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal--open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal__dialog {
+            width: min(440px, 100%);
+            background: var(--panel);
+            border-radius: 28px;
+            padding: 2.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            box-shadow: var(--panel-shadow);
+        }
+
+        .modal__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal__title {
+            margin: 0;
+            font-size: 1.3rem;
+            letter-spacing: 0.04em;
+        }
+
+        .modal__close {
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            font-size: 1.7rem;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        label {
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        input {
+            width: 100%;
+            margin-top: 0.35rem;
+            margin-bottom: 0.75rem;
+            padding: 0.8rem 0.9rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.03);
+            color: inherit;
+            font-size: 1rem;
+        }
+
+        .modal__actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .test-wrapper {
+            flex: 1;
+        }
+
+        .cooldown {
+            position: absolute;
+            inset: 2px;
+            border-radius: inherit;
+            pointer-events: none;
+            background: linear-gradient(120deg, rgba(96, 165, 250, 0.35), rgba(37, 99, 235, 0.35));
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            transform-origin: left;
+            transform: scaleX(0);
+            opacity: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        .btn {
+            padding: 0.85rem 1.1rem;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #05182c;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .chat {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            padding: 2rem;
+            box-shadow: var(--panel-shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        .chat__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .chat__status {
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid rgba(211, 52, 52, 0.6);
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .chat__status--online {
+            border-color: rgba(52, 211, 153, 0.6);
+            color: var(--success);
+            box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.15);
+        }
+
+        .chat-interface {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-messages {
+            min-height: 160px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 0.75rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .chat-empty {
+            text-align: center;
+            color: var(--muted);
+            letter-spacing: 0.02em;
+        }
+
+        .chat-bubble {
+            padding: 0.7rem 0.85rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-bubble--self {
+            background: rgba(96, 165, 250, 0.18);
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .chat-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.35rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .chat-text {
+            color: var(--text);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .chat-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .chat-input {
+            margin: 0;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .chat-send {
+            position: relative;
+        }
+
+        .chat-send__button {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            min-width: 160px;
+            padding-right: 0.9rem;
+            justify-content: space-between;
+        }
+
+        .chat-send__button::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 25%;
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            pointer-events: none;
+        }
+
+        .chat-send__button:hover::after {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-send__label {
+            text-align: left;
+        }
+
+        .chat-send__caret {
+            margin-left: auto;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .chat-menu {
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 8px);
+            width: 230px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--panel);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+            padding: 0.75rem;
+            display: none;
+            z-index: 10;
+        }
+
+        .chat-menu--open {
+            display: block;
+        }
+
+        .chat-menu__item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.35rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .chat-menu__item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chat-menu__item input {
+            margin: 0;
+            width: auto;
+        }
+
+        .chat-pill-warning {
+            padding: 0.6rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(250, 0, 54, 0.534);
+            border: 1px solid rgba(250, 96, 96, 0.3);
+            letter-spacing: 0.06em;
+            font-size: 0.9rem;
+            user-select: none;
+            transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+    </style>
+</head>
+<body>
+    <main class="admin-app">
+        <header>
+            <div>
+                <h1>Tally Lights Admin</h1>
+                <p class="subline">Steuere Kameranamen &amp; Tally Lights in Echtzeit</p>
+            </div>
+            <span class="status-pill" id="live-indicator">Live: unbekannt</span>
+        </header>
+
+        <section class="panel">
+            <div class="camera-grid" id="camera-grid"></div>
+        </section>
+
+        <section class="panel list-chat-card">
+            <h2>Verfügbare Tally Lights</h2>
+            <div class="tally-bank" id="tally-bank">
+                <span class="tally-pill">Keine Lichter geladen</span>
+            </div>
+        </section>
+
+        <section class="chat list-chat-card">
+            <div class="chat__header">
+                <h2>Chat</h2>
+                <span class="chat__status" id="chat-status">Getrennt</span>
+            </div>
+            <div class="chat-interface">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-empty">Keine Nachrichten</div>
+                </div>
+                <form class="chat-form" id="chat-form">
+                    <input class="chat-input" id="chat-input" type="text" placeholder="Nachricht eingeben..." autocomplete="off">
+                    <div class="chat-send">
+                        <button class="btn btn-primary chat-send__button" type="submit" id="chat-send">
+                            <span class="chat-send__label" id="chat-send-label">Senden (Alle)</span>
+                            <span class="chat-send__caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="chat-menu" id="chat-menu" aria-hidden="true"></div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <footer>Tally Lights</footer>
+    </main>
+
+    <div class="modal" id="editor-modal" aria-hidden="true">
+        <div class="modal__dialog">
+            <div class="modal__header">
+                <h2 class="modal__title" id="modal-title">Kamera bearbeiten</h2>
+                <button class="modal__close" type="button" aria-label="Fenster schließen">&times;</button>
+            </div>
+            <div>
+                <label for="camera-name">Kameraname</label>
+                <input id="camera-name" type="text" autocomplete="off" placeholder="Kamera-Namen eingeben">
+            </div>
+            <div>
+                <label for="camera-tally">Tally Light</label>
+                <input id="camera-tally" type="text" autocomplete="off" placeholder="z. B. A oder B" maxlength="6">
+            </div>
+            <div class="modal__actions">
+                <div class="test-wrapper">
+                    <button class="btn btn-ghost" type="button" id="test-light" disabled>
+                        Tally Light testen
+                        <span class="cooldown" id="test-cooldown"></span>
+                    </button>
+                </div>
+                <button class="btn btn-primary" type="button" id="close-editor">Fertig</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        const el = {
+            cameraGrid: document.getElementById("camera-grid"),
+            tallyBank: document.getElementById("tally-bank"),
+            modal: document.getElementById("editor-modal"),
+            modalTitle: document.getElementById("modal-title"),
+            nameInput: document.getElementById("camera-name"),
+            tallyInput: document.getElementById("camera-tally"),
+            testButton: document.getElementById("test-light"),
+            cooldownBar: document.getElementById("test-cooldown"),
+            closeButton: document.getElementById("close-editor"),
+            modalCloseBtn: document.querySelector(".modal__close"),
+            liveIndicator: document.getElementById("live-indicator"),
+            chatMessages: document.getElementById("chat-messages"),
+            chatForm: document.getElementById("chat-form"),
+            chatInput: document.getElementById("chat-input"),
+            chatStatus: document.getElementById("chat-status"),
+            chatSendButton: document.getElementById("chat-send"),
+            chatMenu: document.getElementById("chat-menu"),
+            chatSendLabel: document.getElementById("chat-send-label")
+        };
+
+        const state = {
+            CAMERA_COUNT: 8,
+            cameraData: [],
+            kamera: 0,
+            editingIndex: null,
+            saveTimeout: null,
+            cooldownTimeout: null,
+            tallyPool: [],
+            chatLog: [],
+            recipients: ["all"]
+        };
+
+        state.cameraData = createDefaultData();
+
+        // Helpers
+        function createDefaultData() {
+            return Array.from({ length: state.CAMERA_COUNT }, (_, idx) => ({
+                id: idx + 1,
+                name: `Kamera ${idx + 1}`,
+                tally: ""
+            }));
+        }
+
+        const normalizeList = (liste) => {
+            if (Array.isArray(liste)) return liste;
+            if (typeof liste === "string") {
+                try {
+                    const parsed = JSON.parse(liste);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch (error) {
+                    return liste.split(/[,;\s]+/).filter(Boolean);
+                }
+            }
+            return [];
+        };
+
+        const entryForCamera = (list, id) => {
+            if (!Array.isArray(list)) return undefined;
+            return list[id] ?? list[id - 1];
+        };
+
+        const displayTally = (value) => {
+            if (!value || `${value}`.trim() === "0") return "";
+            return value;
+        };
+
+        // Render functions
+        const renderGrid = () => {
+            el.cameraGrid.innerHTML = "";
+            state.cameraData.forEach((cam, index) => {
+                const tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = `tile${state.kamera === cam.id ? " live" : ""}`;
+                tile.dataset.index = index;
+                tile.innerHTML = `
+                    <span class="tile-id">K${cam.id}</span>
+                    <div class="tile-name">${cam.name || `Kamera ${cam.id}`}</div>
+                    <div class="tile-sub">${displayTally(cam.tally) ? `Tally: ${displayTally(cam.tally)}` : "Kein Tally zugewiesen"}</div>
+                `;
+                el.cameraGrid.appendChild(tile);
+            });
+            renderRecipientMenu();
+        };
+
+        const renderTallyBank = () => {
+            el.tallyBank.innerHTML = "";
+            if (!state.tallyPool.length) {
+                const span = document.createElement("span");
+                span.className = "tally-pill";
+                span.textContent = "Keine Lichter verfügbar";
+                span.style.cursor = "default";
+                el.tallyBank.appendChild(span);
+                return;
+            }
+            state.tallyPool.forEach((tally) => {
+                const pill = document.createElement("div");
+                pill.className = "tally-pill";
+                pill.textContent = tally;
+                pill.draggable = true;
+                pill.dataset.tally = tally;
+                el.tallyBank.appendChild(pill);
+            });
+        };
+
+        const updateLiveIndicator = () => {
+            if (!el.liveIndicator) return;
+            if (state.kamera) {
+                el.liveIndicator.textContent = `Live: Kamera ${state.kamera}`;
+                el.liveIndicator.classList.add("active");
+            } else {
+                el.liveIndicator.textContent = "Live: keine Kamera";
+                el.liveIndicator.classList.remove("active");
+            }
+            document.body.classList.toggle("live-match", Boolean(state.kamera));
+        };
+
+        // Chat helpers (minimal)
+        const renderRecipientMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.innerHTML = "";
+            const addOption = (value, label) => {
+                const item = document.createElement("label");
+                item.className = "chat-menu__item";
+                const input = document.createElement("input");
+                input.type = "checkbox";
+                input.value = value;
+                input.checked = state.recipients.includes(value);
+                input.onchange = () => {
+                    if (value === "all") {
+                        state.recipients = input.checked ? ["all"] : [];
+                    } else {
+                        state.recipients = state.recipients.filter((v) => v !== "all");
+                        state.recipients = input.checked
+                            ? [...state.recipients, value]
+                            : state.recipients.filter((v) => v !== value);
+                    }
+                    if (!state.recipients.length) state.recipients = ["all"];
+                    updateSendLabel();
+                    renderRecipientMenu();
+                };
+                item.append(input, document.createElement("span"));
+                item.lastChild.textContent = label;
+                el.chatMenu.appendChild(item);
+            };
+            addOption("all", "Alle");
+            state.cameraData.forEach((cam) => addOption(cam.id, cam.name || `Kamera ${cam.id}`));
+        };
+
+        const updateSendLabel = () => {
+            if (!el.chatSendLabel) return;
+            if (state.recipients.includes("all")) {
+                el.chatSendLabel.textContent = "Senden (Alle)";
+                return;
+            }
+            const names = state.recipients
+                .map((id) => state.cameraData.find((c) => String(c.id) === String(id))?.name || `K${id}`)
+                .filter(Boolean);
+            el.chatSendLabel.textContent = `Senden (${names.join(", ") || "Alle"})`;
+        };
+
+        const setChatStatus = (connected) => {
+            if (!el.chatStatus) return;
+            el.chatStatus.textContent = connected ? "Verbunden" : "Getrennt";
+            el.chatStatus.classList.toggle("chat__status--online", connected);
+        };
+
+        const renderChatMessages = () => {
+            if (!el.chatMessages) return;
+            el.chatMessages.innerHTML = "";
+            if (!state.chatLog.length) {
+                const empty = document.createElement("div");
+                empty.className = "chat-empty";
+                empty.textContent = "Keine Nachrichten";
+                el.chatMessages.appendChild(empty);
+                return;
+            }
+            state.chatLog.slice(-30).forEach((msg) => {
+                const bubble = document.createElement("div");
+                bubble.className = `chat-bubble${msg.self ? " chat-bubble--self" : ""}`;
+                bubble.textContent = `${msg.author || "?"}: ${msg.text || ""}`;
+                el.chatMessages.appendChild(bubble);
+            });
+            el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
+        };
+
+        const appendChatMessage = (msg) => {
+            if (!msg || !msg.text) return;
+            state.chatLog = [...state.chatLog, msg].slice(-40);
+            renderChatMessages();
+        };
+
+        const buildRecipientsPayload = () => {
+            if (state.recipients.includes("all")) {
+                return { all: "Alle" };
+            }
+            const payload = {};
+            state.recipients.forEach((id, idx) => {
+                const cam = state.cameraData.find((c) => String(c.id) === String(id));
+                payload[idx] = cam?.name || `Kamera ${id}`;
+            });
+            return payload;
+        };
+
+        const applyServerData = (liste) => {
+            const normalized = normalizeList(liste);
+            state.cameraData = state.cameraData.map((camera) => {
+                const entry = entryForCamera(normalized, camera.id);
+                if (!entry && entry !== "" && entry !== 0) return camera;
+                if (typeof entry === "object") {
+                    return {
+                        ...camera,
+                        name: entry.name || camera.name,
+                        tally: entry.tally ?? entry.light ?? entry.value ?? ""
+                    };
+                }
+                return {
+                    ...camera,
+                    tally: entry === null || entry === undefined ? "" : String(entry)
+                };
+            });
+        };
+
+        // Modal + cameras
+        const openEditor = (index) => {
+            state.editingIndex = index;
+            const cam = state.cameraData[index];
+            el.modalTitle.textContent = `Kamera ${cam.id} bearbeiten`;
+            el.nameInput.value = cam.name;
+            el.tallyInput.value = cam.tally;
+            updateTestButton();
+            el.modal.classList.add("modal--open");
+            el.nameInput.focus();
+        };
+
+        const closeEditor = () => {
+            state.editingIndex = null;
+            el.modal.classList.remove("modal--open");
+        };
+
+        const autoSave = () => {
+            clearTimeout(state.saveTimeout);
+            state.saveTimeout = setTimeout(() => {
+                sendeListe();
+            }, 250);
+        };
+
+        const updateTestButton = () => {
+            el.testButton.disabled = !(el.tallyInput.value.trim());
+        };
+
+        const assignTallyToCamera = (cameraIndex, tally) => {
+            const cam = state.cameraData[cameraIndex];
+            if (!cam || !tally) return;
+            cam.tally = tally;
+            renderGrid();
+            renderTallyBank();
+            autoSave();
+        };
+
+        // Events
+        el.cameraGrid.addEventListener("click", (event) => {
+            const tile = event.target.closest(".tile");
+            if (!tile) return;
+            openEditor(Number(tile.dataset.index));
+        });
+
+        el.tallyBank.addEventListener("dragstart", (event) => {
+            const pill = event.target.closest(".tally-pill");
+            if (!pill || !pill.draggable) return;
+            event.dataTransfer.setData("text/plain", pill.dataset.tally);
+            pill.classList.add("dragging");
+        });
+
+        el.tallyBank.addEventListener("dragend", (event) => {
+            const pill = event.target.closest(".tally-pill");
+            if (pill) pill.classList.remove("dragging");
+        });
+
+        el.cameraGrid.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            const tile = event.target.closest(".tile");
+            if (!tile) return;
+            tile.classList.add("drag-over");
+        });
+
+        el.cameraGrid.addEventListener("dragleave", (event) => {
+            const tile = event.target.closest(".tile");
+            if (!tile) return;
+            tile.classList.remove("drag-over");
+        });
+
+        el.cameraGrid.addEventListener("drop", (event) => {
+            event.preventDefault();
+            const tile = event.target.closest(".tile");
+            if (!tile) return;
+            tile.classList.remove("drag-over");
+            const tally = event.dataTransfer.getData("text/plain");
+            assignTallyToCamera(Number(tile.dataset.index), tally);
+        });
+
+        el.modal.addEventListener("click", (event) => {
+            if (event.target === el.modal) closeEditor();
+        });
+
+        el.modalCloseBtn.addEventListener("click", closeEditor);
+        el.closeButton.addEventListener("click", closeEditor);
+
+        el.nameInput.addEventListener("input", () => {
+            if (state.editingIndex === null) return;
+            const cam = state.cameraData[state.editingIndex];
+            const value = el.nameInput.value.trim();
+            cam.name = value || `Kamera ${cam.id}`;
+            el.nameInput.value = cam.name;
+            renderGrid();
+            autoSave();
+        });
+
+        el.tallyInput.addEventListener("input", () => {
+            if (state.editingIndex === null) return;
+            const cam = state.cameraData[state.editingIndex];
+            cam.tally = el.tallyInput.value.trim().toUpperCase();
+            el.tallyInput.value = cam.tally;
+            renderGrid();
+            updateTestButton();
+            autoSave();
+        });
+
+        el.testButton.addEventListener("click", () => {
+            if (state.editingIndex === null) return;
+            const tally = state.cameraData[state.editingIndex].tally;
+            if (!tally) return;
+            markLight(tally);
+            triggerCooldown();
+        });
+
+        el.chatForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const text = el.chatInput.value.trim();
+            if (!text) return;
+            const time = Math.floor(Date.now() / 1000);
+            //appendChatMessage({ author: "Admin", text, time, self: true });
+            el.chatInput.value = "";
+            const recipients = buildRecipientsPayload();
+            nachricht = recipients  + ": " +  text
+            sendChatMessage({ author: "Admin", recipients, text, time });
+            closeMenu();
+        });
+
+        el.chatSendButton.addEventListener("click", (event) => {
+            const rect = el.chatSendButton.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const openMenu = clickX >= rect.width * 0.75;
+            if (openMenu) {
+                event.preventDefault();
+                toggleMenu();
+            }
+        });
+
+        document.addEventListener("click", (event) => {
+            if (!el.chatMenu || !el.chatSendButton) return;
+            if (el.chatMenu.contains(event.target) || el.chatSendButton.contains(event.target)) return;
+            closeMenu();
+        });
+
+        socket.on("connect", () => setChatStatus(true));
+        socket.on("disconnect", () => setChatStatus(false));
+
+        socket.on("chat", (data) => {
+            if (typeof data === "string") {
+                try {
+                    data = JSON.parse(data);
+                } catch (error) {
+                    data = {};
+                }
+            }
+            console.log(data);
+            
+            appendChatMessage({
+                author: data?.author || "Raspi",
+                text: data?.text || "",
+                time: data?.time || Date.now()
+            });
+        });
+
+        socket.on("chat_history", (history) => {
+            if (!Array.isArray(history)) return;
+            state.chatLog = history
+                .map((entry) => ({
+                    author: entry?.author || "Unbekannt",
+                    text: entry?.text || "",
+                    time: entry?.time || Date.now(),
+                    self: entry?.self || false
+                }))
+                .filter((entry) => entry.text);
+            renderChatMessages();
+        });
+
+        socket.on("Update", (data) => {
+            state.kamera = Number(data?.Kamera) || 0;
+            applyServerData(data?.Liste);
+            state.tallyPool = data?.TallyPool || state.tallyPool;
+            renderGrid();
+            renderTallyBank();
+            updateLiveIndicator();
+        });
+
+        // Chat menu helpers
+        const toggleMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.classList.toggle("chat-menu--open");
+            el.chatMenu.setAttribute("aria-hidden", el.chatMenu.classList.contains("chat-menu--open") ? "false" : "true");
+        };
+
+        const closeMenu = () => {
+            if (!el.chatMenu) return;
+            el.chatMenu.classList.remove("chat-menu--open");
+            el.chatMenu.setAttribute("aria-hidden", "true");
+        };
+
+        // Init
+        renderGrid();
+        renderTallyBank();
+        updateLiveIndicator();
+        renderChatMessages();
+        setChatStatus(socket.connected);
+        updateSendLabel();
+        renderRecipientMenu();
+
+        // Other utilities
+        const triggerCooldown = () => {
+            clearTimeout(state.cooldownTimeout);
+            el.testButton.disabled = true;
+            el.cooldownBar.style.transition = "none";
+            el.cooldownBar.style.transform = "scaleX(1)";
+            el.cooldownBar.style.opacity = "1";
+            requestAnimationFrame(() => {
+                el.cooldownBar.style.transition = "transform 2s linear, opacity 0.3s ease 1.7s";
+                el.cooldownBar.style.transform = "scaleX(0)";
+                el.cooldownBar.style.opacity = "0";
+            });
+            state.cooldownTimeout = setTimeout(() => {
+                updateTestButton();
+            }, 2000);
+        };
+
+        function sendeListe() {
+            const payload = Array(state.CAMERA_COUNT + 1).fill(null);
+            state.cameraData.forEach((cam) => {
+                payload[cam.id] = { name: cam.name, tally: cam.tally };
+            });
+            socket.emit("admin_command", { cameras: payload, tallyPool: state.tallyPool });
+        }
+
+        function markLight(light) {
+            socket.emit("markLight", light);
+        }
+
+        function sendChatMessage({ author, recipients, text, time }) {
+            socket.emit("chat", { author, recipients, text, time });
+        }
+    </script>
+</body>
+</html>

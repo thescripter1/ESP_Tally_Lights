@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tally Lights Live Monitor</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #05070e;
+            --surface: rgba(255, 255, 255, 0.05);
+            --surface-strong: rgba(255, 255, 255, 0.08);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f4f4f5;
+            --muted: #9da2b6;
+            --accent: #66e2a4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 3rem 1.5rem 4rem;
+            min-height: 100vh;
+            background: radial-gradient(circle at top, #111830, var(--bg));
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.35s ease;
+        }
+
+        body.live-match {
+            background: radial-gradient(circle at top, #7f1d1d, #2d0606);
+        }
+
+        .layout {
+            width: min(600px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 1.75rem;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.75rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .live-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .live-label {
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        #live-camera {
+            font-size: clamp(2.5rem, 7vw, 4rem);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--surface-strong);
+            color: inherit;
+            font-size: 1rem;
+            appearance: none;
+            outline: none;
+        }
+
+        .list-card h2 {
+            margin: 0 0 0.8rem;
+            font-size: 1rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .chip {
+            padding: 0.35rem 0.85rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        /* Chat */
+        .chat {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat__messages {
+            min-height: 160px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 0.75rem;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .chat__bubble {
+            padding: 0.7rem 0.85rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat__bubble--self {
+            background: rgba(102, 226, 164, 0.18);
+            border-color: rgba(102, 226, 164, 0.35);
+        }
+
+        .chat__bubble--target {
+            box-shadow: 0 0 0 2px rgba(102, 226, 164, 0.4);
+        }
+
+        .chat__form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem;
+        }
+
+        .chat__input {
+            margin: 0;
+            width: 100%;
+            padding: 0.85rem 1rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--surface-strong);
+            color: inherit;
+            font-size: 1rem;
+        }
+
+        .chat__send {
+            padding: 0.85rem 1.05rem;
+            border-radius: 14px;
+            border: none;
+            background: var(--accent);
+            color: #04100a;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        footer {
+            text-align: right;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <section class="panel live-card">
+            <span class="live-label">Aktuell live</span>
+            <div id="live-camera">—</div>
+            
+            <label for="camera-select">Zu überwachende Kamera</label>
+            <select id="camera-select"></select>
+        </section>
+
+        <section class="panel list-card">
+            <h2>Gesamte Liste</h2>
+            <div class="chips" id="list-chips">
+                <span class="muted">Keine Liste empfangen.</span>
+            </div>
+        </section>
+
+        <section class="chat">
+            <h2>Chat</h2>
+            <div class="chat__messages" id="chat-messages">
+                <div class="muted">Keine Nachrichten</div>
+            </div>
+            <form class="chat__form" id="chat-form">
+                <input class="chat__input" id="chat-input" type="text" placeholder="Nachricht an alle..." autocomplete="off">
+                <button class="chat__send" type="submit">Senden</button>
+            </form>
+        </section>
+
+        <footer>Tally Lights</footer>
+    </div>
+
+    <script>
+        const socket = io();
+        const cameraSelect = document.getElementById("camera-select");
+        const liveCameraEl = document.getElementById("live-camera");
+        const listChipsEl = document.getElementById("list-chips");
+        const chatMessagesEl = document.getElementById("chat-messages");
+        const chatForm = document.getElementById("chat-form");
+        const chatInput = document.getElementById("chat-input");
+
+        const DEFAULT_CAMERA_COUNT = 8;
+        let tallyListe = [];
+        let kamera = 0;
+        let lastCameraCount = 0;
+        let chatLog = [];
+
+        const normalizeList = (liste) => {
+            if (Array.isArray(liste)) return liste;
+            if (typeof liste === "string") {
+                try {
+                    const parsed = JSON.parse(liste);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch (error) {
+                    return liste.split(/[,;\s]+/).filter(Boolean);
+                }
+            }
+            return [];
+        };
+
+        const renderCameraOptions = () => {
+            const count = tallyListe.length || DEFAULT_CAMERA_COUNT;
+            if (lastCameraCount === count && cameraSelect.options.length === count) return;
+
+            const previous = Number(cameraSelect.value) || 1;
+            cameraSelect.innerHTML = "";
+            for (let i = 1; i <= count; i++) {
+                const option = document.createElement("option");
+                option.value = i;
+                option.textContent = `Kamera ${i}`;
+                cameraSelect.appendChild(option);
+            }
+            cameraSelect.value = String(previous <= count ? previous : 1);
+            lastCameraCount = count;
+        };
+
+        const updateSelectionHighlight = () => {
+            if (!cameraSelect.value) return;
+            const selectedCamera = Number(cameraSelect.value);
+            document.body.classList.toggle("live-match", kamera !== 0 && kamera === selectedCamera);
+        };
+
+        const renderLiveDisplay = () => {
+            liveCameraEl.textContent = kamera ? `Kamera ${kamera}` : "Keine Kamera live";
+        };
+
+        const renderListChips = () => {
+            listChipsEl.innerHTML = "";
+            if (!tallyListe.length) {
+                const span = document.createElement("span");
+                span.className = "muted";
+                span.textContent = "Keine Liste empfangen.";
+                listChipsEl.appendChild(span);
+                return;
+            }
+
+            tallyListe.forEach((item, index) => {
+                if (index === 0) return;
+                const chip = document.createElement("div");
+                chip.className = "chip";
+                chip.textContent = `K${index}: ${item || "-"}`;
+                listChipsEl.appendChild(chip);
+            });
+        };
+
+        const currentCameraLabel = () => {
+            const option = cameraSelect.options[cameraSelect.selectedIndex];
+            return option ? option.textContent : "";
+        };
+
+        const renderChat = () => {
+            chatMessagesEl.innerHTML = "";
+            if (!chatLog.length) {
+                const span = document.createElement("div");
+                span.className = "muted";
+                span.textContent = "Keine Nachrichten";
+                chatMessagesEl.appendChild(span);
+                return;
+            }
+
+            chatLog.slice(-40).forEach((msg) => {
+                const bubble = document.createElement("div");
+                const isTarget = Boolean(msg.isTarget);
+                bubble.className = `chat__bubble${msg.self ? " chat__bubble--self" : ""}${isTarget ? " chat__bubble--target" : ""}`;
+                bubble.textContent = `${msg.author || "?"}: ${msg.text || ""}`;
+                chatMessagesEl.appendChild(bubble);
+            });
+
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+        };
+
+        const appendChatMessage = (msg) => {
+            if (!msg || !msg.text) return;
+            chatLog = [...chatLog, msg].slice(-50);
+            renderChat();
+        };
+
+        const buildRecipientsPayload = () => ({ all: "Alle" });
+
+        socket.on("Update", (data) => {
+            kamera = Number(data?.Kamera) || 0;
+            tallyListe = normalizeList(data?.Liste);
+
+            renderCameraOptions();
+            updateSelectionHighlight();
+            renderLiveDisplay();
+            renderListChips();
+        });
+
+        const parseChatData = (data) => {
+            if (typeof data === "string") {
+                try {
+                    return JSON.parse(data);
+                } catch (error) {
+                    return {};
+                }
+            }
+            return data || {};
+        };
+
+
+        socket.on("chat", (data) => {
+            data = parseChatData(data);
+            console.log(data)
+            const camLabel = currentCameraLabel();
+            const recipients = data?.recipients || {};
+            const values = typeof recipients === "object" ? Object.values(recipients) : [];
+            const targeted = values.some((val) => val && String(val).toLowerCase() === camLabel.toLowerCase());
+
+            console.log(recipients)
+            console.log(values)
+            console.log(targeted)
+
+            
+            appendChatMessage({
+                author: data?.author || "Unbekannt",
+                text: data?.text || "",
+                time: data?.time || Math.floor(Date.now() / 1000),
+                isTarget: targeted
+            });
+        });
+
+        chatForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text) return;
+            const time = Math.floor(Date.now() / 1000);
+            const recipients = buildRecipientsPayload();
+            //appendChatMessage({ author: cameraSelect, text, time, self: true });
+            chatInput.value = "";
+            socket.emit("chat", { author: "Kamera "+ cameraSelect.value, text, time, recipients });
+        });
+
+        renderCameraOptions();
+        cameraSelect.addEventListener("change", updateSelectionHighlight);
+        renderChat();
+    </script>
+</body>
+</html>

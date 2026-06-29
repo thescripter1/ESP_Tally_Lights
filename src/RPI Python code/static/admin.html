@@ -100,6 +100,33 @@
             box-shadow: 0 0 12px rgba(52, 211, 153, 0.6);
         }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .save-pill {
+            padding: 0.65rem 1.15rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .save-pill--ok {
+            border-color: rgba(52, 211, 153, 0.5);
+            color: var(--success);
+        }
+
+        .save-pill--error {
+            border-color: rgba(251, 113, 133, 0.55);
+            color: var(--danger);
+        }
+
         .panel {
             background: var(--panel);
             border: 1px solid var(--panel-border);
@@ -560,7 +587,10 @@
                 <h1>Tally Lights Admin</h1>
                 <p class="subline">Steuere Kameranamen &amp; Tally Lights in Echtzeit</p>
             </div>
-            <span class="status-pill" id="live-indicator">Live: unbekannt</span>
+            <div class="header-actions">
+                <span class="save-pill" id="save-status">Bereit</span>
+                <span class="status-pill" id="live-indicator">Live: unbekannt</span>
+            </div>
         </header>
 
         <section class="panel">
@@ -646,7 +676,8 @@
             chatStatus: document.getElementById("chat-status"),
             chatSendButton: document.getElementById("chat-send"),
             chatMenu: document.getElementById("chat-menu"),
-            chatSendLabel: document.getElementById("chat-send-label")
+            chatSendLabel: document.getElementById("chat-send-label"),
+            saveStatus: document.getElementById("save-status")
         };
 
         const state = {
@@ -674,10 +705,12 @@
         }
 
         const normalizeList = (liste) => {
+            if (liste && Array.isArray(liste.cameras)) return liste.cameras;
             if (Array.isArray(liste)) return liste;
             if (typeof liste === "string") {
                 try {
                     const parsed = JSON.parse(liste);
+                    if (parsed && Array.isArray(parsed.cameras)) return parsed.cameras;
                     if (Array.isArray(parsed)) return parsed;
                 } catch (error) {
                     return liste.split(/[,;\s]+/).filter(Boolean);
@@ -800,6 +833,13 @@
             el.chatStatus.classList.toggle("chat__status--online", connected);
         };
 
+        const setSaveStatus = (message, mode = "") => {
+            if (!el.saveStatus) return;
+            el.saveStatus.textContent = message;
+            el.saveStatus.classList.toggle("save-pill--ok", mode === "ok");
+            el.saveStatus.classList.toggle("save-pill--error", mode === "error");
+        };
+
         const renderChatMessages = () => {
             if (!el.chatMessages) return;
             el.chatMessages.innerHTML = "";
@@ -875,6 +915,7 @@
 
         const autoSave = () => {
             clearTimeout(state.saveTimeout);
+            setSaveStatus("Speichere...");
             state.saveTimeout = setTimeout(() => {
                 sendeListe();
             }, 250);
@@ -1039,6 +1080,14 @@
             renderGrid();
             renderTallyBank();
             updateLiveIndicator();
+        });
+
+        socket.on("save_status", (status) => {
+            if (status?.ok) {
+                setSaveStatus(status.message || "Gespeichert", "ok");
+                return;
+            }
+            setSaveStatus(status?.message || "Speichern fehlgeschlagen", "error");
         });
 
         // Chat menu helpers

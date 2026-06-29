@@ -234,10 +234,12 @@
         let chatLog = [];
 
         const normalizeList = (liste) => {
+            if (liste && Array.isArray(liste.cameras)) return liste.cameras;
             if (Array.isArray(liste)) return liste;
             if (typeof liste === "string") {
                 try {
                     const parsed = JSON.parse(liste);
+                    if (parsed && Array.isArray(parsed.cameras)) return parsed.cameras;
                     if (Array.isArray(parsed)) return parsed;
                 } catch (error) {
                     return liste.split(/[,;\s]+/).filter(Boolean);
@@ -248,14 +250,13 @@
 
         const renderCameraOptions = () => {
             const count = tallyListe.length || DEFAULT_CAMERA_COUNT;
-            if (lastCameraCount === count && cameraSelect.options.length === count) return;
-
             const previous = Number(cameraSelect.value) || 1;
             cameraSelect.innerHTML = "";
             for (let i = 1; i <= count; i++) {
                 const option = document.createElement("option");
+                const camera = tallyListe[i];
                 option.value = i;
-                option.textContent = `Kamera ${i}`;
+                option.textContent = camera?.name || `Kamera ${i}`;
                 cameraSelect.appendChild(option);
             }
             cameraSelect.value = String(previous <= count ? previous : 1);
@@ -269,7 +270,8 @@
         };
 
         const renderLiveDisplay = () => {
-            liveCameraEl.textContent = kamera ? `Kamera ${kamera}` : "Keine Kamera live";
+            const camera = tallyListe[kamera];
+            liveCameraEl.textContent = kamera ? (camera?.name || `Kamera ${kamera}`) : "Keine Kamera live";
         };
 
         const renderListChips = () => {
@@ -286,7 +288,11 @@
                 if (index === 0) return;
                 const chip = document.createElement("div");
                 chip.className = "chip";
-                chip.textContent = `K${index}: ${item || "-"}`;
+                if (item && typeof item === "object") {
+                    chip.textContent = `K${index}: ${item.name || `Kamera ${index}`} (${item.tally || "-"})`;
+                } else {
+                    chip.textContent = `K${index}: ${item || "-"}`;
+                }
                 listChipsEl.appendChild(chip);
             });
         };

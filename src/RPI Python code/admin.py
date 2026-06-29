@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 from pathlib import Path
 import threading
 import time
@@ -28,7 +28,13 @@ def _register_routes():
 
     @socketio.on("admin_command")
     def handle_admin(Liste):
-        set_Liste(Liste)
+        try:
+            if not isinstance(Liste, dict) or not isinstance(Liste.get("cameras"), list):
+                raise ValueError("Liste muss ein Objekt mit cameras-Array sein")
+            set_Liste(Liste)
+            emit("save_status", {"ok": True, "message": "Gespeichert"})
+        except Exception as error:
+            emit("save_status", {"ok": False, "message": str(error)})
 
     @socketio.on("markLight")
     def handle_marking(Licht):

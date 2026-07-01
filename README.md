@@ -526,6 +526,18 @@ curl -I http://127.0.0.1:1234/
 
 Both `curl` commands should return `HTTP/1.1 200 OK`.
 
+View the service logs with `journalctl`. To show all logs from the current boot and then keep following new log lines live, use:
+
+```bash
+journalctl -u tally-lights -b -n all -f
+```
+
+Press `Ctrl+C` to leave the live log view. This only stops `journalctl`; it does not stop the Python server. If you only want the most recent log lines and then live updates, use:
+
+```bash
+journalctl -u tally-lights -b -n 100 -f
+```
+
 ## ESP8266 Firmware Setup
 
 Open `src/Arduino Code/ESP_Tally_Light/ESP_Tally_Light.ino` in the Arduino IDE or PlatformIO.
@@ -609,6 +621,14 @@ sudo systemctl status tally-lights
 journalctl -u tally-lights -n 100 --no-pager
 ss -ltnp | grep -E ':4321|:1234'
 ```
+
+For a full live startup log from the current boot, use:
+
+```bash
+journalctl -u tally-lights -b -n all -f
+```
+
+The `-f` option follows new log lines, and `-n all` prevents `journalctl` from showing only the default last 10 lines before entering live mode.
 
 If `ss` does not show `0.0.0.0:4321` and `0.0.0.0:1234`, the dashboard servers are not running. 
 When testing in a browser, use plain HTTP:

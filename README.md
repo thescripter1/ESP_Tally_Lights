@@ -304,13 +304,13 @@ Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` 
 
 ### Optional systemd Service
 
-Create a service so the server starts automatically:
+A systemd service starts the Python server automatically when the Pi boots. This is the recommended setup once the server works manually.
 
 ```bash
 sudo nano /etc/systemd/system/tally-lights.service
 ```
 
-Use:
+Use the example below, but make sure `WorkingDirectory` and `ExecStart` match the directory where you copied the Python server. If you used the copy command from this README, the path is `/home/tally/tally-lights-server/main.py`.
 
 ```ini
 [Unit]
@@ -329,6 +329,14 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
+If you use a virtual environment, point `ExecStart` to that Python interpreter instead:
+
+```ini
+ExecStart=/home/tally/.venv/bin/python /home/tally/tally-lights-server/main.py
+```
+
+Do not reuse an old service file that points to a removed script. A stale path such as `/home/tally/tally/Gui/tally_server.py` will make the service fail immediately, and the dashboard ports will never open.
+
 Enable it:
 
 ```bash
@@ -337,6 +345,16 @@ sudo systemctl enable tally-lights
 sudo systemctl start tally-lights
 sudo systemctl status tally-lights
 ```
+
+Verify that the dashboards are actually listening:
+
+```bash
+ss -ltnp | grep -E ':4321|:1234'
+curl -I http://127.0.0.1:4321/
+curl -I http://127.0.0.1:1234/
+```
+
+Both `curl` commands should return `HTTP/1.1 200 OK`.
 
 ## ESP8266 Firmware Setup
 
@@ -411,6 +429,29 @@ Connect a device to the `Tally-Lights` Wi-Fi network and open:
 The admin dashboard can assign tally IDs to camera numbers and briefly mark a selected light purple for identification. The client dashboard shows the current live camera and the configured camera list.
 
 ## Troubleshooting
+
+### Dashboard pages are not reachable
+
+First check whether the Python server is running:
+
+```bash
+sudo systemctl status tally-lights
+journalctl -u tally-lights -n 100 --no-pager
+ss -ltnp | grep -E ':4321|:1234'
+```
+
+If `ss` does not show `0.0.0.0:4321` and `0.0.0.0:1234`, the dashboard servers are not running. The most common cause is a wrong `ExecStart` path in the systemd service. The service must point to the real `main.py` file and to the Python interpreter that has the required dependencies installed.
+
+When testing in a browser, use plain HTTP:
+
+```text
+http://192.168.4.1:4321
+http://192.168.4.1:1234
+```
+
+Do not use `https://` unless you have explicitly configured TLS. If the Python log shows unreadable request bytes followed by `Bad request version`, a browser or device is trying HTTPS against the HTTP-only Flask server.
+
+If you connect your laptop directly to the Pi over Ethernet, make sure both devices are in the same IPv4 subnet. For the documented Pi address `192.168.2.11/24`, a laptop address such as `192.168.2.100/24` is appropriate. An address such as `192.168.0.250/16` can make mDNS/IPv6 SSH to `tally.local` work while direct IPv4 access to `192.168.2.11` still fails because replies are routed incorrectly.
 
 ### The Wi-Fi access point does not appear
 

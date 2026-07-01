@@ -335,8 +335,6 @@ If you use a virtual environment, point `ExecStart` to that Python interpreter i
 ExecStart=/home/tally/.venv/bin/python /home/tally/tally-lights-server/main.py
 ```
 
-Do not reuse an old service file that points to a removed script. A stale path such as `/home/tally/tally/Gui/tally_server.py` will make the service fail immediately, and the dashboard ports will never open.
-
 Enable it:
 
 ```bash
@@ -440,8 +438,7 @@ journalctl -u tally-lights -n 100 --no-pager
 ss -ltnp | grep -E ':4321|:1234'
 ```
 
-If `ss` does not show `0.0.0.0:4321` and `0.0.0.0:1234`, the dashboard servers are not running. The most common cause is a wrong `ExecStart` path in the systemd service. The service must point to the real `main.py` file and to the Python interpreter that has the required dependencies installed.
-
+If `ss` does not show `0.0.0.0:4321` and `0.0.0.0:1234`, the dashboard servers are not running. 
 When testing in a browser, use plain HTTP:
 
 ```text
@@ -450,8 +447,6 @@ http://192.168.4.1:1234
 ```
 
 Do not use `https://` unless you have explicitly configured TLS. If the Python log shows unreadable request bytes followed by `Bad request version`, a browser or device is trying HTTPS against the HTTP-only Flask server.
-
-If you connect your laptop directly to the Pi over Ethernet, make sure both devices are in the same IPv4 subnet. For the documented Pi address `192.168.2.11/24`, a laptop address such as `192.168.2.100/24` is appropriate. An address such as `192.168.0.250/16` can make mDNS/IPv6 SSH to `tally.local` work while direct IPv4 access to `192.168.2.11` still fails because replies are routed incorrectly.
 
 ### The Wi-Fi access point does not appear
 

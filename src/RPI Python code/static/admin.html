@@ -654,10 +654,12 @@
 
         const normalizeList = (liste) => {
             if (Array.isArray(liste)) return liste;
+            if (liste && typeof liste === "object" && Array.isArray(liste.cameras)) return liste.cameras;
             if (typeof liste === "string") {
                 try {
                     const parsed = JSON.parse(liste);
                     if (Array.isArray(parsed)) return parsed;
+                    if (parsed && typeof parsed === "object" && Array.isArray(parsed.cameras)) return parsed.cameras;
                 } catch (error) {
                     return liste.split(/[,;\s]+/).filter(Boolean);
                 }
@@ -1009,7 +1011,7 @@
         socket.on("Update", (data) => {
             state.kamera = Number(data?.Kamera) || 0;
             applyServerData(data?.Liste);
-            state.tallyPool = data?.TallyPool || state.tallyPool;
+            state.tallyPool = data?.TallyPool || data?.Pool || data?.Liste?.tallyPool || state.tallyPool;
             renderGrid();
             renderTallyBank();
             updateLiveIndicator();

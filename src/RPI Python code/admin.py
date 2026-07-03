@@ -3,7 +3,7 @@ from flask_socketio import SocketIO
 from pathlib import Path
 import threading
 import time
-from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool
+from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool
 from tally import makeLila
 
 from chat import save_message, get_latest_message
@@ -26,6 +26,8 @@ def _register_routes():
 
     @socketio.on("admin_command")
     def handle_admin(Liste):
+        if isinstance(Liste, dict) and "tallyPool" in Liste:
+            set_Pool(Liste["tallyPool"])
         set_Liste(Liste)
 
     @socketio.on("markLight")
@@ -50,7 +52,7 @@ def _watcher():
         if Kamera != lastKamera or Liste != lastListe or Pool != lastPool:
             socketio.emit(
                 "Update",
-                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool}
+                {"Kamera": Kamera, "Liste": Liste, "TallyPool": Pool, "Pool": Pool}
             )
             lastKamera = Kamera
             lastListe = Liste

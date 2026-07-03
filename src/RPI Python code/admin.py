@@ -19,10 +19,24 @@ lastPool = None
 last_message = None
 
 
+def _state_payload():
+    Pool = get_Pool()
+    return {
+        "Kamera": get_Kamera(),
+        "Liste": get_Liste(),
+        "TallyPool": Pool,
+        "Pool": Pool,
+    }
+
+
 def _register_routes():
     @app.route("/")
     def index():
         return app.send_static_file("admin.html")
+
+    @socketio.on("connect")
+    def handle_connect():
+        socketio.emit("Update", _state_payload())
 
     @socketio.on("admin_command")
     def handle_admin(Liste):
@@ -50,10 +64,7 @@ def _watcher():
         message = get_latest_message()
 
         if Kamera != lastKamera or Liste != lastListe or Pool != lastPool:
-            socketio.emit(
-                "Update",
-                {"Kamera": Kamera, "Liste": Liste, "TallyPool": Pool, "Pool": Pool}
-            )
+            socketio.emit("Update", _state_payload())
             lastKamera = Kamera
             lastListe = Liste
             lastPool = Pool

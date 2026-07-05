@@ -93,6 +93,7 @@ The Raspberry Pi server reads runtime settings from `config/config.json`. Existi
 
 ```json
 {
+  "Mode": "production",
   "Settings": {
     "atem_ip": "192.168.2.10",
     "mqtt_host": "127.0.0.1",
@@ -105,10 +106,13 @@ The Raspberry Pi server reads runtime settings from `config/config.json`. Existi
     "program_color": "#ff0000",
     "preview_color": "#00ff00",
     "off_color": "#000000",
-    "identify_color": "#c832c8"
+    "identify_color": "#c832c8",
+    "operating_mode": "production"
   }
 }
 ```
+
+`Mode` is the persisted current runtime mode. `production` connects to the real ATEM switcher, while `test` uses the built-in camera-change simulator. `Settings.operating_mode` is only the fallback used when no saved `Mode` exists yet.
 
 Supported environment overrides:
 
@@ -126,6 +130,7 @@ Supported environment overrides:
 | `TALLY_PREVIEW_COLOR` | Color for the active Preview camera |
 | `TALLY_OFF_COLOR` | Color for assigned cameras that are neither Program nor Preview |
 | `TALLY_IDENTIFY_COLOR` | Temporary color used by the admin identify/test action |
+| `TALLY_OPERATING_MODE` | Fallback mode when no saved `Mode` exists (`production` or `test`) |
 
 Missing values fall back to the documented defaults. Invalid numeric values print a warning and fall back to the safe default for that setting.
 
@@ -541,9 +546,9 @@ The server starts three components using the values from `config/config.json`:
 
 - Admin dashboard: `http://192.168.4.1:4321`
 - Client dashboard: `http://192.168.4.1:1234`
-- ATEM listener, connecting to `Settings.atem_ip`
+- ATEM listener in `production` mode, connecting to `Settings.atem_ip`
 
-Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers.
+Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers. The mode selector in the admin header switches between the real ATEM listener and the test simulator without restarting the server. Test mode also generates randomized temporary tally lights so the assignment UI can be tried without real ESP devices.
 
 ### Optional systemd Service
 

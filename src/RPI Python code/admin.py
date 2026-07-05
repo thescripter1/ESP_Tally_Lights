@@ -4,8 +4,8 @@ from pathlib import Path
 import threading
 import time
 
-from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool
-from tally import makeLila, get_device_statuses
+from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, get_Mode, set_Mode
+from tally import makeLila, get_device_statuses, get_visible_pool
 from settings import SETTINGS
 
 from chat import save_message, get_latest_message
@@ -20,15 +20,17 @@ lastListe = None
 lastPool = None
 lastDevices = None
 last_message = None
+lastMode = None
 
 
 def _state_payload():
-    Pool = get_Pool()
+    Pool = get_visible_pool() if get_Mode() == "test" else get_Pool()
     return {
         "Kamera": get_Kamera(),
         "Liste": get_Liste(),
         "TallyPool": Pool,
         "Pool": Pool,
+        "Mode": get_Mode(),
     }
 
 
@@ -55,6 +57,15 @@ def _register_routes():
     def handle_marking(Licht):
         makeLila(Licht)
 
+    @socketio.on("set_mode")
+    def handle_mode(mode):
+        try:
+            set_Mode(mode)
+            socketio.emit("Update", _state_payload())
+            emit("mode_status", {"ok": True, "mode": get_Mode(), "message": "Modus gespeichert"})
+        except Exception as error:
+            emit("mode_status", {"ok": False, "message": str(error)})
+
     @socketio.on("chat")
     def handle_mesaage(nachricht):
         #print(nachricht)
@@ -62,24 +73,27 @@ def _register_routes():
 
 
 def _watcher():
-    global lastKamera, lastListe, lastPool, lastDevices, last_message
+    global lastKamera, lastListe, lastPool, lastDevices, last_message, lastMode
 
     while True:
         Kamera = get_Kamera()
         Liste = get_Liste()
         Pool = get_Pool()
+        Mode = get_Mode()
+        VisiblePool = get_visible_pool() if Mode == "test" else Pool
         Devices = get_device_statuses()
         message = get_latest_message()
 
-        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool or Devices != lastDevices:
+        if Kamera != lastKamera or Liste != lastListe or VisiblePool != lastPool or Devices != lastDevices or Mode != lastMode:
             socketio.emit(
                 "Update",
-                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool, "Devices": Devices}
+                {"Kamera": Kamera, "Liste": Liste, "Pool": VisiblePool, "Devices": Devices, "Mode": Mode}
             )
             lastKamera = Kamera
             lastListe = Liste
-            lastPool = Pool
+            lastPool = VisiblePool
             lastDevices = Devices
+            lastMode = Mode
 
         if  message != last_message:
             socketio.emit("chat", message)

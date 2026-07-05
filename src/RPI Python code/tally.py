@@ -1,6 +1,7 @@
 import time
+import random
 import paho.mqtt.client as mqtt
-from shared_state import get_Liste, set_Pool
+from shared_state import get_Liste, get_Mode, set_Pool
 from settings import SETTINGS
 
 
@@ -9,8 +10,10 @@ client = mqtt.Client()
 
 connected_devices = set()
 device_last_seen = {}
+test_connected_devices = {}
 last_light_colors = {}
 DEVICE_TIMEOUT_SECONDS = 30
+TEST_DEVICE_IDS = tuple("ABCDEFGHJKLMNPQRSTUVWXYZ")
 
 
 def on_connect(client, userdata, flags, rc, *args):
@@ -134,6 +137,9 @@ def disconnect_Tally():
 
 
 def get_device_statuses():
+    if get_Mode() == "test":
+        return _get_test_device_statuses()
+
     now = time.time()
     statuses = []
     for device_id in sorted(connected_devices):
@@ -144,3 +150,40 @@ def get_device_statuses():
             "lastSeen": last_seen,
         })
     return statuses
+
+
+def randomize_test_devices():
+    now = time.time()
+    max_devices = min(len(TEST_DEVICE_IDS), max(4, SETTINGS["camera_count"]))
+    count = random.randint(2, max_devices)
+    selected = random.sample(TEST_DEVICE_IDS, count)
+
+    test_connected_devices.clear()
+    for device_id in selected:
+        online = random.random() > 0.2
+        test_connected_devices[device_id] = {
+            "online": online,
+            "lastSeen": now if online else now - random.randint(DEVICE_TIMEOUT_SECONDS + 5, DEVICE_TIMEOUT_SECONDS + 90),
+        }
+
+
+def get_visible_pool():
+    if get_Mode() == "test":
+        if not test_connected_devices:
+            randomize_test_devices()
+        return sorted(test_connected_devices)
+    return list(connected_devices)
+
+
+def _get_test_device_statuses():
+    if not test_connected_devices:
+        randomize_test_devices()
+
+    return [
+        {
+            "id": device_id,
+            "online": details["online"],
+            "lastSeen": details["lastSeen"],
+        }
+        for device_id, details in sorted(test_connected_devices.items())
+    ]

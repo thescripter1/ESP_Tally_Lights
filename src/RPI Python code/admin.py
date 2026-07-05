@@ -91,4 +91,4 @@ def _watcher():
 def run():
     _register_routes()
     threading.Thread(target=_watcher, daemon=True).start()
-    socketio.run(app, host=SETTINGS["admin_host"], port=SETTINGS["admin_port"])
+    socketio.run(app, host=SETTINGS["admin_host"], port=SETTINGS["admin_port"], allow_unsafe_werkzeug=True)

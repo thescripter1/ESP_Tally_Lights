@@ -43,6 +43,7 @@
     "TallyPool": [
         "A"
     ],
+    "Mode": "production",
     "Settings": {
         "atem_ip": "192.168.2.10",
         "mqtt_host": "127.0.0.1",
@@ -55,6 +56,7 @@
         "program_color": "#ff0000",
         "preview_color": "#00ff00",
         "off_color": "#000000",
-        "identify_color": "#c832c8"
+        "identify_color": "#c832c8",
+        "operating_mode": "production"
     }
 }

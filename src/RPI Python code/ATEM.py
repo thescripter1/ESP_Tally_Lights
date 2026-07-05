@@ -1,26 +1,37 @@
 import time
 import random
-from shared_state import set_Kamera
+from shared_state import get_Mode, set_Kamera
 from tally import makeDark, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
 
-current_input = random.randint(1, 8)
 
-def run():
+def _sleep_while_mode(mode, seconds):
+    end_time = time.time() + seconds
+    while time.time() < end_time:
+        if get_Mode() != mode:
+            return False
+        time.sleep(min(0.2, end_time - time.time()))
+    return True
+
+
+def _run_test_mode():
     last_src = 0
     max_camera = SETTINGS["camera_count"]
-    while True:
-        # Veränderung erst nach 10–20 Sekunden
-        wait_time = random.randint(2, 5)
-        time.sleep(wait_time)
+    current_input = random.randint(1, max_camera)
+
+    while get_Mode() == "test":
+        if not _sleep_while_mode("test", random.randint(2, 5)):
+            return
 
         # Neuen Input wählen (aber nicht gleichen wie vorher)
         new_input = current_input
-        while new_input == current_input:
-            new_input = random.randint(1, 8)
+        if max_camera > 1:
+            while new_input == current_input:
+                new_input = random.randint(1, max_camera)
 
         set_Kamera(new_input)
+        current_input = new_input
 
         src = new_input
 
@@ -46,15 +57,16 @@ class ReadAtem:
         switcher.connect(SETTINGS["atem_ip"])
         switcher.waitForConnection()"""
 
-def run2():
+def _run_production_mode():
     reconnect_delay = 3
 
-    while True:
+    while get_Mode() == "production":
         switcher = PyATEMMax.ATEMMax()
         try:
             print(f"Versuche Verbindung mit ATEM {SETTINGS['atem_ip']}")
-            switcher.connect(SETTINGS["atem_ip"])
-            switcher.waitForConnection()
+            switcher.connect(SETTINGS["atem_ip"], connTimeout=3)
+            if not switcher.waitForConnection(infinite=False):
+                raise TimeoutError("ATEM Verbindung konnte nicht innerhalb des Timeouts hergestellt werden")
             print("ATEM Verbindung hergestellt")
 
             max_camera = SETTINGS["camera_count"]
@@ -63,7 +75,7 @@ def run2():
             set_Kamera(last_program)
             update_tally_states(last_program, last_preview)
 
-            while True:
+            while get_Mode() == "production":
                 program_src = switcher.programInput[0].videoSource.value
                 preview_src = switcher.previewInput[0].videoSource.value
                 if program_src != last_program or preview_src != last_preview:
@@ -84,5 +96,22 @@ def run2():
                 switcher.disconnect()
             except Exception:
                 pass
-            print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
-            time.sleep(reconnect_delay)
+            if get_Mode() == "production":
+                print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
+                _sleep_while_mode("production", reconnect_delay)
+
+
+def run():
+    last_mode = None
+    while True:
+        mode = get_Mode()
+        if mode != last_mode:
+            print(f"ATEM Betriebsmodus: {mode}")
+            last_mode = mode
+
+        if mode == "test":
+            _run_test_mode()
+        elif mode == "production":
+            _run_production_mode()
+        else:
+            time.sleep(1)

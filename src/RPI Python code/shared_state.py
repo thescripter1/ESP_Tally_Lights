@@ -3,6 +3,16 @@ from multiprocessing import Manager
 
 from settings import CONFIG_FILE, SETTINGS
 
+MODE_VALUES = {"production", "test"}
+
+
+def _validated_mode(mode):
+    normalized = str(mode or "").strip().lower()
+    if normalized in MODE_VALUES:
+        return normalized
+    print(f"Warnung: Ungültiger Modus {mode!r}. Nutze production.")
+    return "production"
+
 
 def _default_cameras():
     cameras = [None]
@@ -18,6 +28,7 @@ def default_state():
             "cameras": _default_cameras()
         },
         "TallyPool": [],
+        "Mode": _validated_mode(SETTINGS["operating_mode"]),
         "Settings": SETTINGS,
     }
 
@@ -29,6 +40,7 @@ def load_state():
                 data = json.load(file)
             if not all(key in data for key in ["Kamera", "Liste", "TallyPool"]):
                 raise ValueError("Pflichtfelder Kamera, Liste oder TallyPool fehlen")
+            data["Mode"] = _validated_mode(data.get("Mode", SETTINGS["operating_mode"]))
             data["Settings"] = SETTINGS
             return data
         except json.JSONDecodeError as error:
@@ -81,6 +93,16 @@ def set_Pool(pool):
 
 def get_Pool():
     return state["TallyPool"]
+
+
+def set_Mode(mode):
+    state["Mode"] = _validated_mode(mode)
+    save_state(dict(state))
+    print("Modus geändert auf:", state["Mode"])
+
+
+def get_Mode():
+    return _validated_mode(state.get("Mode", SETTINGS["operating_mode"]))
 
 
 print("Liste:   ", get_Liste())

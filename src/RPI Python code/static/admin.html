@@ -110,6 +110,26 @@
             justify-content: flex-end;
         }
 
+        .mode-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.45rem 0.65rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .mode-control select {
+            width: auto;
+            margin: 0;
+            padding: 0.35rem 1.9rem 0.35rem 0.55rem;
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
         .save-pill {
             padding: 0.65rem 1.15rem;
             border-radius: 999px;
@@ -590,6 +610,13 @@
                 <p class="subline">Steuere Kameranamen &amp; Tally Lights in Echtzeit</p>
             </div>
             <div class="header-actions">
+                <label class="mode-control" for="operating-mode">
+                    Modus
+                    <select id="operating-mode">
+                        <option value="production">Produktion</option>
+                        <option value="test">Test</option>
+                    </select>
+                </label>
                 <span class="save-pill" id="save-status">Bereit</span>
                 <span class="status-pill" id="live-indicator">Live: unbekannt</span>
             </div>
@@ -679,7 +706,8 @@
             chatSendButton: document.getElementById("chat-send"),
             chatMenu: document.getElementById("chat-menu"),
             chatSendLabel: document.getElementById("chat-send-label"),
-            saveStatus: document.getElementById("save-status")
+            saveStatus: document.getElementById("save-status"),
+            operatingMode: document.getElementById("operating-mode")
         };
 
         const state = {
@@ -692,7 +720,8 @@
             tallyPool: [],
             devices: [],
             chatLog: [],
-            recipients: ["all"]
+            recipients: ["all"],
+            mode: "production"
         };
 
         state.cameraData = createDefaultData();
@@ -778,13 +807,22 @@
         const updateLiveIndicator = () => {
             if (!el.liveIndicator) return;
             if (state.kamera) {
-                el.liveIndicator.textContent = `Live: Kamera ${state.kamera}`;
+                const modeLabel = state.mode === "test" ? "Test" : "Live";
+                el.liveIndicator.textContent = `${modeLabel}: Kamera ${state.kamera}`;
                 el.liveIndicator.classList.add("active");
             } else {
-                el.liveIndicator.textContent = "Live: keine Kamera";
+                el.liveIndicator.textContent = state.mode === "test" ? "Test: keine Kamera" : "Live: keine Kamera";
                 el.liveIndicator.classList.remove("active");
             }
             document.body.classList.toggle("live-match", Boolean(state.kamera));
+        };
+
+        const applyMode = (mode) => {
+            state.mode = mode === "test" ? "test" : "production";
+            if (el.operatingMode && el.operatingMode.value !== state.mode) {
+                el.operatingMode.value = state.mode;
+            }
+            updateLiveIndicator();
         };
 
         // Chat helpers (minimal)
@@ -986,6 +1024,13 @@
         el.modalCloseBtn.addEventListener("click", closeEditor);
         el.closeButton.addEventListener("click", closeEditor);
 
+        el.operatingMode.addEventListener("change", () => {
+            const nextMode = el.operatingMode.value === "test" ? "test" : "production";
+            applyMode(nextMode);
+            setSaveStatus("Modus wird gespeichert...");
+            socket.emit("set_mode", nextMode);
+        });
+
         el.nameInput.addEventListener("input", () => {
             if (state.editingIndex === null) return;
             const cam = state.cameraData[state.editingIndex];
@@ -1081,6 +1126,7 @@
             applyServerData(data?.Liste);
             state.tallyPool = data?.Pool || data?.TallyPool || state.tallyPool;
             state.devices = Array.isArray(data?.Devices) ? data.Devices : state.devices;
+            applyMode(data?.Mode);
             renderGrid();
             renderTallyBank();
             updateLiveIndicator();
@@ -1092,6 +1138,15 @@
                 return;
             }
             setSaveStatus(status?.message || "Speichern fehlgeschlagen", "error");
+        });
+
+        socket.on("mode_status", (status) => {
+            if (status?.ok) {
+                applyMode(status.mode);
+                setSaveStatus(status.message || "Modus gespeichert", "ok");
+                return;
+            }
+            setSaveStatus(status?.message || "Modus konnte nicht gespeichert werden", "error");
         });
 
         // Chat menu helpers

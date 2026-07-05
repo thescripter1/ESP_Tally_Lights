@@ -14,7 +14,7 @@ if __name__ == "__main__":
     threads = [
         threading.Thread(target=AdminDashboard.run),
         threading.Thread(target=ClientDashboard.run),
-        threading.Thread(target=atem.run2)
+        threading.Thread(target=atem.run)
     ]
 
     for t in threads:

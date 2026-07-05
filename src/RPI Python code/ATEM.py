@@ -1,7 +1,7 @@
 import time
 import random
 from shared_state import get_Mode, set_Kamera
-from tally import makeDark, update_tally_states
+from tally import makeDark, randomize_test_devices, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
 
@@ -17,10 +17,16 @@ def _sleep_while_mode(mode, seconds):
 
 def _run_test_mode():
     last_src = 0
+    last_device_shuffle = 0
     max_camera = SETTINGS["camera_count"]
     current_input = random.randint(1, max_camera)
 
     while get_Mode() == "test":
+        now = time.time()
+        if now - last_device_shuffle > 10:
+            randomize_test_devices()
+            last_device_shuffle = now
+
         if not _sleep_while_mode("test", random.randint(2, 5)):
             return
 

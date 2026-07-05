@@ -5,7 +5,7 @@ import threading
 import time
 
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool, get_Mode, set_Mode
-from tally import makeLila, get_device_statuses
+from tally import makeLila, get_device_statuses, get_visible_pool
 from settings import SETTINGS
 
 from chat import save_message, get_latest_message
@@ -24,7 +24,7 @@ lastMode = None
 
 
 def _state_payload():
-    Pool = get_Pool()
+    Pool = get_visible_pool() if get_Mode() == "test" else get_Pool()
     return {
         "Kamera": get_Kamera(),
         "Liste": get_Liste(),
@@ -79,18 +79,19 @@ def _watcher():
         Kamera = get_Kamera()
         Liste = get_Liste()
         Pool = get_Pool()
-        Devices = get_device_statuses()
         Mode = get_Mode()
+        VisiblePool = get_visible_pool() if Mode == "test" else Pool
+        Devices = get_device_statuses()
         message = get_latest_message()
 
-        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool or Devices != lastDevices or Mode != lastMode:
+        if Kamera != lastKamera or Liste != lastListe or VisiblePool != lastPool or Devices != lastDevices or Mode != lastMode:
             socketio.emit(
                 "Update",
-                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool, "Devices": Devices, "Mode": Mode}
+                {"Kamera": Kamera, "Liste": Liste, "Pool": VisiblePool, "Devices": Devices, "Mode": Mode}
             )
             lastKamera = Kamera
             lastListe = Liste
-            lastPool = Pool
+            lastPool = VisiblePool
             lastDevices = Devices
             lastMode = Mode
 

@@ -548,7 +548,7 @@ The server starts three components using the values from `config/config.json`:
 - Client dashboard: `http://192.168.4.1:1234`
 - ATEM listener in `production` mode, connecting to `Settings.atem_ip`
 
-Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers. The mode selector in the admin header switches between the real ATEM listener and the test simulator without restarting the server.
+Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers. The mode selector in the admin header switches between the real ATEM listener and the test simulator without restarting the server. Test mode also generates randomized temporary tally lights so the assignment UI can be tried without real ESP devices.
 
 ### Optional systemd Service
 

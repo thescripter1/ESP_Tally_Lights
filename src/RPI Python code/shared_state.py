@@ -1,5 +1,6 @@
 import json
-from multiprocessing import Manager
+import copy
+import threading
 
 from settings import CONFIG_FILE, SETTINGS
 
@@ -49,38 +50,41 @@ def save_state(state_dict):
         print(f"Warnung: config.json konnte nicht gespeichert werden: {error}")
 
 
-manager = Manager()
-state = manager.dict(load_state())
+_state_lock = threading.RLock()
+state = load_state()
 
 
 def set_Kamera(kamera):
-    state["Kamera"] = kamera
-    save_state(dict(state))
+    with _state_lock:
+        state["Kamera"] = kamera
+        save_state(copy.deepcopy(state))
     print("Kamera geändert auf:", kamera)
 
 
 def get_Kamera():
-    return state["Kamera"]
+    with _state_lock:
+        return state["Kamera"]
 
 
 def set_Liste(lst):
-    state["Liste"] = lst
-    save_state(dict(state))
+    with _state_lock:
+        state["Liste"] = lst
+        save_state(copy.deepcopy(state))
     print("Liste geändert auf:", lst)
 
 
 def get_Liste():
-    return state["Liste"]
+    with _state_lock:
+        return copy.deepcopy(state["Liste"])
 
 
 def set_Pool(pool):
-    state["TallyPool"] = pool
-    save_state(dict(state))
+    with _state_lock:
+        state["TallyPool"] = pool
+        save_state(copy.deepcopy(state))
     print("TallyPool geändert auf:", pool)
 
 
 def get_Pool():
-    return state["TallyPool"]
-
-
-print("Liste:   ", get_Liste())
+    with _state_lock:
+        return list(state["TallyPool"])

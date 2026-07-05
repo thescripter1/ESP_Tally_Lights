@@ -86,3 +86,33 @@ def run2():
                 pass
             print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
             time.sleep(reconnect_delay)
+            
+
+
+def run3():
+    print("In der aktuellen Konfiguration wird nur die ATEM CCU Control Funktionen getestet. Die Tally Lights sind daher nicht aktiv.")
+    
+    switcher = PyATEMMax.ATEMMax()
+
+    def on_receive(params):
+        print(
+            "Command:",
+            params.get("cmd"),
+            "Name:",
+            params.get("cmdName")
+        )
+
+    switcher.registerEvent(
+        switcher.atem.events.receive,
+        on_receive
+    )
+
+    switcher.connect(SETTINGS["atem_ip"])
+    switcher.waitForConnection()
+
+    print("Jetzt am ATEM GAIN, FOCUS, BLACK oder SHUT drücken")
+    print("und anschließend die Pfeiltasten betätigen.")
+
+    input("Enter zum Beenden\n")
+
+    switcher.disconnect()

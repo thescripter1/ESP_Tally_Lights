@@ -1,6 +1,6 @@
 import threading
-import client as ClientDashboard
-import admin as AdminDashboard
+#import client as ClientDashboard
+#import admin as AdminDashboard
 import ATEM as atem
 from settings import SETTINGS
 
@@ -12,9 +12,9 @@ if __name__ == "__main__":
     print(f"Client UI: http://{SETTINGS['client_host']}:{SETTINGS['client_port']}")
 
     threads = [
-        threading.Thread(target=AdminDashboard.run),
-        threading.Thread(target=ClientDashboard.run),
-        threading.Thread(target=atem.run2)
+        #threading.Thread(target=AdminDashboard.run),
+        #threading.Thread(target=ClientDashboard.run),
+        threading.Thread(target=atem.run3)
     ]
 
     for t in threads:

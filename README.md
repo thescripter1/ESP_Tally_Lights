@@ -85,11 +85,11 @@ These values are used by the current code and examples:
 | Client dashboard | `http://192.168.4.1:1234` |
 | Friendly client URL | `http://tally.local` |
 
-Change Raspberry Pi server values in `src/RPI Python code/config/config.json` if your network uses different addresses. ESP firmware Wi-Fi and MQTT values are still compile-time settings in the Arduino sketch.
+Change Raspberry Pi server values in `config/config.json` (next to `main.py` on the Pi, or `src/RPI Python code/config/config.json` in this repo) if your network uses different addresses. ESP firmware Wi-Fi and MQTT values are still compile-time settings in the Arduino sketch.
 
 ## Server Configuration
 
-The Raspberry Pi server reads runtime settings from `src/RPI Python code/config/config.json`. Existing camera and tally assignments are stored in the same file, while server settings live under `Settings`:
+The Raspberry Pi server reads runtime settings from `config/config.json`. Existing camera and tally assignments are stored in the same file, while server settings live under `Settings`:
 
 ```json
 {

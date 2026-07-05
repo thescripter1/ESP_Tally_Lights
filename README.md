@@ -6,8 +6,6 @@ A DIY wireless tally light system for Blackmagic ATEM video switchers. A Raspber
 > [!NOTE]
 > Some code and variable names are still German. Runtime network and service settings are configured through `config/config.json` or environment variables.
 
-![ESP Tally Light](https://github.com/user-attachments/assets/def7a56f-405d-4a1b-bcd7-a389e9b9be46)
-
 ## What It Does
 
 - Reads the active program input from a Blackmagic ATEM switcher.
@@ -85,6 +83,7 @@ These values are used by the current code and examples:
 | ATEM IP | `192.168.2.10` |
 | Admin dashboard | `http://192.168.4.1:4321` |
 | Client dashboard | `http://192.168.4.1:1234` |
+| Friendly client URL | `http://tally.local` |
 
 Change Raspberry Pi server values in `src/RPI Python code/config/config.json` if your network uses different addresses. ESP firmware Wi-Fi and MQTT values are still compile-time settings in the Arduino sketch.
 
@@ -253,8 +252,14 @@ Use:
 
 ```ini
 interface=wlan0
-dhcp-range=192.168.4.2,192.168.4.50,255.255.255.0,24h
+bind-interfaces
+
+dhcp-range=192.168.4.10,192.168.4.50,255.255.255.0,24h
+dhcp-option=option:router,192.168.4.1
+dhcp-option=option:dns-server,192.168.4.1
 ```
+
+This makes Wi-Fi clients use the Raspberry Pi as their router and DNS server. The friendly client URL uses the Raspberry Pi's mDNS/Avahi hostname in step 8 because Apple devices handle `.local` names reliably in Safari.
 
 ### 6. Assign a Static Wi-Fi IP to the Pi
 
@@ -289,6 +294,171 @@ Reboot and check that the `Tally-Lights` Wi-Fi network appears:
 
 ```bash
 sudo reboot
+```
+
+### 8. Add Friendly Dashboard URLs
+
+The client dashboard runs on port `1234`, but users should not have to type that port. Use the Raspberry Pi's Avahi/mDNS hostname for the Safari-friendly `.local` name, then redirect port `80` to the already running Flask client server.
+
+The resulting client URL is:
+
+```text
+http://tally.local
+```
+
+Avoid private pseudo-TLDs such as `.lan` for this. Some browsers, especially Safari, may treat unknown suffixes as a search query unless the user types the full URL perfectly.
+
+First make sure Avahi is running and the Pi hostname is `tally`:
+
+```bash
+hostname
+cat /etc/hostname
+sudo systemctl status avahi-daemon
+```
+
+The hostname should be:
+
+```text
+tally
+```
+
+If you change the hostname, restart Avahi:
+
+```bash
+sudo systemctl restart avahi-daemon
+```
+
+Then redirect normal HTTP traffic to the existing dashboard ports. The client dashboard is reachable at `http://tally.local`; the admin dashboard remains reachable at `http://tally.local:4321`.
+
+Create the helper script:
+
+```bash
+sudo nano /usr/local/sbin/tally-dns-shortcuts.sh
+```
+
+Use:
+
+```sh
+#!/bin/sh
+set -eu
+
+WIFI_IF="${WIFI_IF:-wlan0}"
+WIFI_IP="${WIFI_IP:-192.168.4.1}"
+LAN_IP="${LAN_IP:-192.168.2.11}"
+CLIENT_IP="${CLIENT_IP:-192.168.4.2}"
+ADMIN_PORT="${ADMIN_PORT:-4321}"
+CLIENT_PORT="${CLIENT_PORT:-1234}"
+
+ensure_alias() {
+    if ! ip -4 addr show dev "$WIFI_IF" | grep -q "${CLIENT_IP}/24"; then
+        ip addr add "${CLIENT_IP}/24" dev "$WIFI_IF"
+    fi
+}
+
+ensure_rule() {
+    chain="$1"
+    dest_ip="$2"
+    dest_port="$3"
+    target_port="$4"
+
+    if ! iptables -t nat -C "$chain" -p tcp -d "$dest_ip" --dport "$dest_port" -j REDIRECT --to-ports "$target_port" 2>/dev/null; then
+        iptables -t nat -A "$chain" -p tcp -d "$dest_ip" --dport "$dest_port" -j REDIRECT --to-ports "$target_port"
+    fi
+}
+
+remove_rule() {
+    chain="$1"
+    dest_ip="$2"
+    dest_port="$3"
+    target_port="$4"
+
+    while iptables -t nat -C "$chain" -p tcp -d "$dest_ip" --dport "$dest_port" -j REDIRECT --to-ports "$target_port" 2>/dev/null; do
+        iptables -t nat -D "$chain" -p tcp -d "$dest_ip" --dport "$dest_port" -j REDIRECT --to-ports "$target_port"
+    done
+}
+
+remove_http_rules() {
+    chain="$1"
+    dest_ip="$2"
+
+    remove_rule "$chain" "$dest_ip" 80 "$ADMIN_PORT"
+    remove_rule "$chain" "$dest_ip" 80 "$CLIENT_PORT"
+}
+
+case "${1:-start}" in
+    start)
+        ensure_alias
+        remove_http_rules PREROUTING "$WIFI_IP"
+        remove_http_rules PREROUTING "$LAN_IP"
+        remove_http_rules PREROUTING "$CLIENT_IP"
+        remove_http_rules OUTPUT "$WIFI_IP"
+        remove_http_rules OUTPUT "$LAN_IP"
+        remove_http_rules OUTPUT "$CLIENT_IP"
+        ensure_rule PREROUTING "$WIFI_IP" 80 "$CLIENT_PORT"
+        ensure_rule PREROUTING "$LAN_IP" 80 "$CLIENT_PORT"
+        ensure_rule PREROUTING "$CLIENT_IP" 80 "$CLIENT_PORT"
+        ensure_rule OUTPUT "$WIFI_IP" 80 "$CLIENT_PORT"
+        ensure_rule OUTPUT "$LAN_IP" 80 "$CLIENT_PORT"
+        ensure_rule OUTPUT "$CLIENT_IP" 80 "$CLIENT_PORT"
+        ;;
+    stop)
+        remove_http_rules PREROUTING "$WIFI_IP"
+        remove_http_rules PREROUTING "$LAN_IP"
+        remove_http_rules PREROUTING "$CLIENT_IP"
+        remove_http_rules OUTPUT "$WIFI_IP"
+        remove_http_rules OUTPUT "$LAN_IP"
+        remove_http_rules OUTPUT "$CLIENT_IP"
+        ip addr del "${CLIENT_IP}/24" dev "$WIFI_IF" 2>/dev/null || true
+        ;;
+    restart)
+        "$0" stop
+        "$0" start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}" >&2
+        exit 2
+        ;;
+esac
+```
+
+Enable it:
+
+```bash
+sudo chmod 755 /usr/local/sbin/tally-dns-shortcuts.sh
+sudo nano /etc/systemd/system/tally-dns-shortcuts.service
+```
+
+Use:
+
+```ini
+[Unit]
+Description=Tally Lights friendly DNS URL shortcuts
+After=network-online.target dnsmasq.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/tally-dns-shortcuts.sh start
+ExecStop=/usr/local/sbin/tally-dns-shortcuts.sh stop
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable tally-dns-shortcuts.service
+sudo systemctl restart tally-dns-shortcuts.service
+```
+
+After reconnecting to the `Tally-Lights` Wi-Fi network, these URLs should work:
+
+```text
+http://tally.local
+http://tally.local:4321
 ```
 
 ## MQTT Broker Setup
@@ -377,13 +547,13 @@ Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` 
 
 ### Optional systemd Service
 
-Create a service so the server starts automatically:
+A systemd service starts the Python server automatically when the Pi boots. This is the recommended setup once the server works manually.
 
 ```bash
 sudo nano /etc/systemd/system/tally-lights.service
 ```
 
-Use:
+Use the example below, but make sure `WorkingDirectory` and `ExecStart` match the directory where you copied the Python server. If you used the copy command from this README, the path is `/home/tally/tally-lights-server/main.py`.
 
 ```ini
 [Unit]
@@ -402,6 +572,12 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
+If you use a virtual environment, point `ExecStart` to that Python interpreter instead:
+
+```ini
+ExecStart=/home/tally/.venv/bin/python /home/tally/tally-lights-server/main.py
+```
+
 Enable it:
 
 ```bash
@@ -409,6 +585,28 @@ sudo systemctl daemon-reload
 sudo systemctl enable tally-lights
 sudo systemctl start tally-lights
 sudo systemctl status tally-lights
+```
+
+Verify that the dashboards are actually listening:
+
+```bash
+ss -ltnp | grep -E ':4321|:1234'
+curl -I http://127.0.0.1:4321/
+curl -I http://127.0.0.1:1234/
+```
+
+Both `curl` commands should return `HTTP/1.1 200 OK`.
+
+View the service logs with `journalctl`. To show all logs from the current boot and then keep following new log lines live, use:
+
+```bash
+journalctl -u tally-lights -b -n all -f
+```
+
+Press `Ctrl+C` to leave the live log view. This only stops `journalctl`; it does not stop the Python server. If you only want the most recent log lines and then live updates, use:
+
+```bash
+journalctl -u tally-lights -b -n 100 -f
 ```
 
 ## ESP8266 Firmware Setup
@@ -493,6 +691,34 @@ Connect a device to the `Tally-Lights` Wi-Fi network and open:
 The admin dashboard can assign tally IDs to camera numbers and briefly mark a selected light purple for identification. The client dashboard shows the current live camera and the configured camera list.
 
 ## Troubleshooting
+
+### Dashboard pages are not reachable
+
+First check whether the Python server is running:
+
+```bash
+sudo systemctl status tally-lights
+journalctl -u tally-lights -n 100 --no-pager
+ss -ltnp | grep -E ':4321|:1234'
+```
+
+For a full live startup log from the current boot, use:
+
+```bash
+journalctl -u tally-lights -b -n all -f
+```
+
+The `-f` option follows new log lines, and `-n all` prevents `journalctl` from showing only the default last 10 lines before entering live mode.
+
+If `ss` does not show `0.0.0.0:4321` and `0.0.0.0:1234`, the dashboard servers are not running. 
+When testing in a browser, use plain HTTP:
+
+```text
+http://192.168.4.1:4321
+http://192.168.4.1:1234
+```
+
+Do not use `https://` unless you have explicitly configured TLS. If the Python log shows unreadable request bytes followed by `Bad request version`, a browser or device is trying HTTPS against the HTTP-only Flask server.
 
 ### The Wi-Fi access point does not appear
 

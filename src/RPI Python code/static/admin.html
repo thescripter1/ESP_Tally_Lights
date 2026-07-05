@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tally Lights Admin</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="icon" type="image/png" href="/static/favicon-admin.png">
+    <link rel="apple-touch-icon" href="/static/favicon-admin.png">
+    <script src="/static/socket.io.min.js"></script>
     <style>
         :root {
             color-scheme: light dark;
@@ -707,11 +709,13 @@
         const normalizeList = (liste) => {
             if (liste && Array.isArray(liste.cameras)) return liste.cameras;
             if (Array.isArray(liste)) return liste;
+            if (liste && typeof liste === "object" && Array.isArray(liste.cameras)) return liste.cameras;
             if (typeof liste === "string") {
                 try {
                     const parsed = JSON.parse(liste);
                     if (parsed && Array.isArray(parsed.cameras)) return parsed.cameras;
                     if (Array.isArray(parsed)) return parsed;
+                    if (parsed && typeof parsed === "object" && Array.isArray(parsed.cameras)) return parsed.cameras;
                 } catch (error) {
                     return liste.split(/[,;\s]+/).filter(Boolean);
                 }

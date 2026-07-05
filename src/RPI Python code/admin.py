@@ -3,7 +3,8 @@ from flask_socketio import SocketIO, emit
 from pathlib import Path
 import threading
 import time
-from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool
+
+from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool
 from tally import makeLila, get_device_statuses
 from settings import SETTINGS
 
@@ -21,10 +22,24 @@ lastDevices = None
 last_message = None
 
 
+def _state_payload():
+    Pool = get_Pool()
+    return {
+        "Kamera": get_Kamera(),
+        "Liste": get_Liste(),
+        "TallyPool": Pool,
+        "Pool": Pool,
+    }
+
+
 def _register_routes():
     @app.route("/")
     def index():
         return app.send_static_file("admin.html")
+
+    @socketio.on("connect")
+    def handle_connect():
+        socketio.emit("Update", _state_payload())
 
     @socketio.on("admin_command")
     def handle_admin(Liste):

@@ -19,6 +19,7 @@ DEFAULT_SETTINGS = {
     "preview_color": "#00ff00",
     "off_color": "#000000",
     "identify_color": "#c832c8",
+    "operating_mode": "production",
 }
 
 ENV_OVERRIDES = {
@@ -34,6 +35,7 @@ ENV_OVERRIDES = {
     "TALLY_PREVIEW_COLOR": "preview_color",
     "TALLY_OFF_COLOR": "off_color",
     "TALLY_IDENTIFY_COLOR": "identify_color",
+    "TALLY_OPERATING_MODE": "operating_mode",
 }
 
 INT_FIELDS = {"mqtt_port", "admin_port", "client_port", "camera_count"}

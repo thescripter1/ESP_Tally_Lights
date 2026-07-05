@@ -66,7 +66,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=${USER}
+User=${SUDO_USER:-$USER}
 WorkingDirectory=${SERVER_DIR}
 ExecStart=${PYTHON_BIN} ${SERVER_DIR}/main.py
 Restart=always

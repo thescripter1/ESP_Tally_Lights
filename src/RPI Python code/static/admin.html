@@ -102,6 +102,33 @@
             box-shadow: 0 0 12px rgba(52, 211, 153, 0.6);
         }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .save-pill {
+            padding: 0.65rem 1.15rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .save-pill--ok {
+            border-color: rgba(52, 211, 153, 0.5);
+            color: var(--success);
+        }
+
+        .save-pill--error {
+            border-color: rgba(251, 113, 133, 0.55);
+            color: var(--danger);
+        }
+
         .panel {
             background: var(--panel);
             border: 1px solid var(--panel-border);
@@ -210,6 +237,26 @@
         .tally-pill.dragging {
             opacity: 0.7;
             transform: scale(1.05);
+        }
+
+        .tally-pill--offline {
+            opacity: 0.55;
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tally-status {
+            display: inline-block;
+            width: 0.55rem;
+            height: 0.55rem;
+            margin-right: 0.45rem;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .tally-status--online {
+            background: var(--success);
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
         }
 
         .tile.drag-over {
@@ -542,7 +589,10 @@
                 <h1>Tally Lights Admin</h1>
                 <p class="subline">Steuere Kameranamen &amp; Tally Lights in Echtzeit</p>
             </div>
-            <span class="status-pill" id="live-indicator">Live: unbekannt</span>
+            <div class="header-actions">
+                <span class="save-pill" id="save-status">Bereit</span>
+                <span class="status-pill" id="live-indicator">Live: unbekannt</span>
+            </div>
         </header>
 
         <section class="panel">
@@ -628,7 +678,8 @@
             chatStatus: document.getElementById("chat-status"),
             chatSendButton: document.getElementById("chat-send"),
             chatMenu: document.getElementById("chat-menu"),
-            chatSendLabel: document.getElementById("chat-send-label")
+            chatSendLabel: document.getElementById("chat-send-label"),
+            saveStatus: document.getElementById("save-status")
         };
 
         const state = {
@@ -639,6 +690,7 @@
             saveTimeout: null,
             cooldownTimeout: null,
             tallyPool: [],
+            devices: [],
             chatLog: [],
             recipients: ["all"]
         };
@@ -655,11 +707,13 @@
         }
 
         const normalizeList = (liste) => {
+            if (liste && Array.isArray(liste.cameras)) return liste.cameras;
             if (Array.isArray(liste)) return liste;
             if (liste && typeof liste === "object" && Array.isArray(liste.cameras)) return liste.cameras;
             if (typeof liste === "string") {
                 try {
                     const parsed = JSON.parse(liste);
+                    if (parsed && Array.isArray(parsed.cameras)) return parsed.cameras;
                     if (Array.isArray(parsed)) return parsed;
                     if (parsed && typeof parsed === "object" && Array.isArray(parsed.cameras)) return parsed.cameras;
                 } catch (error) {
@@ -708,11 +762,15 @@
                 return;
             }
             state.tallyPool.forEach((tally) => {
+                const device = state.devices.find((item) => item.id === tally);
+                const online = device ? device.online : false;
                 const pill = document.createElement("div");
-                pill.className = "tally-pill";
-                pill.textContent = tally;
-                pill.draggable = true;
+                pill.className = `tally-pill${online ? "" : " tally-pill--offline"}`;
+                pill.draggable = online;
                 pill.dataset.tally = tally;
+                const dot = document.createElement("span");
+                dot.className = `tally-status${online ? " tally-status--online" : ""}`;
+                pill.append(dot, document.createTextNode(`${tally} ${online ? "online" : "offline"}`));
                 el.tallyBank.appendChild(pill);
             });
         };
@@ -777,6 +835,13 @@
             if (!el.chatStatus) return;
             el.chatStatus.textContent = connected ? "Verbunden" : "Getrennt";
             el.chatStatus.classList.toggle("chat__status--online", connected);
+        };
+
+        const setSaveStatus = (message, mode = "") => {
+            if (!el.saveStatus) return;
+            el.saveStatus.textContent = message;
+            el.saveStatus.classList.toggle("save-pill--ok", mode === "ok");
+            el.saveStatus.classList.toggle("save-pill--error", mode === "error");
         };
 
         const renderChatMessages = () => {
@@ -854,6 +919,7 @@
 
         const autoSave = () => {
             clearTimeout(state.saveTimeout);
+            setSaveStatus("Speichere...");
             state.saveTimeout = setTimeout(() => {
                 sendeListe();
             }, 250);
@@ -1013,10 +1079,19 @@
         socket.on("Update", (data) => {
             state.kamera = Number(data?.Kamera) || 0;
             applyServerData(data?.Liste);
-            state.tallyPool = data?.TallyPool || data?.Pool || data?.Liste?.tallyPool || state.tallyPool;
+            state.tallyPool = data?.Pool || data?.TallyPool || state.tallyPool;
+            state.devices = Array.isArray(data?.Devices) ? data.Devices : state.devices;
             renderGrid();
             renderTallyBank();
             updateLiveIndicator();
+        });
+
+        socket.on("save_status", (status) => {
+            if (status?.ok) {
+                setSaveStatus(status.message || "Gespeichert", "ok");
+                return;
+            }
+            setSaveStatus(status?.message || "Speichern fehlgeschlagen", "error");
         });
 
         // Chat menu helpers

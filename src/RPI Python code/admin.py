@@ -1,10 +1,12 @@
 from flask import Flask
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 from pathlib import Path
 import threading
 import time
+
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool
-from tally import makeLila
+from tally import makeLila, get_device_statuses
+from settings import SETTINGS
 
 from chat import save_message, get_latest_message
 
@@ -16,6 +18,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 lastKamera = None
 lastListe = None
 lastPool = None
+lastDevices = None
 last_message = None
 
 
@@ -40,9 +43,13 @@ def _register_routes():
 
     @socketio.on("admin_command")
     def handle_admin(Liste):
-        if isinstance(Liste, dict) and "tallyPool" in Liste:
-            set_Pool(Liste["tallyPool"])
-        set_Liste(Liste)
+        try:
+            if not isinstance(Liste, dict) or not isinstance(Liste.get("cameras"), list):
+                raise ValueError("Liste muss ein Objekt mit cameras-Array sein")
+            set_Liste(Liste)
+            emit("save_status", {"ok": True, "message": "Gespeichert"})
+        except Exception as error:
+            emit("save_status", {"ok": False, "message": str(error)})
 
     @socketio.on("markLight")
     def handle_marking(Licht):
@@ -55,19 +62,24 @@ def _register_routes():
 
 
 def _watcher():
-    global lastKamera, lastListe, lastPool, last_message
+    global lastKamera, lastListe, lastPool, lastDevices, last_message
 
     while True:
         Kamera = get_Kamera()
         Liste = get_Liste()
         Pool = get_Pool()
+        Devices = get_device_statuses()
         message = get_latest_message()
 
-        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool:
-            socketio.emit("Update", _state_payload())
+        if Kamera != lastKamera or Liste != lastListe or Pool != lastPool or Devices != lastDevices:
+            socketio.emit(
+                "Update",
+                {"Kamera": Kamera, "Liste": Liste, "Pool": Pool, "Devices": Devices}
+            )
             lastKamera = Kamera
             lastListe = Liste
             lastPool = Pool
+            lastDevices = Devices
 
         if  message != last_message:
             socketio.emit("chat", message)
@@ -79,4 +91,4 @@ def _watcher():
 def run():
     _register_routes()
     threading.Thread(target=_watcher, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=4321, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=SETTINGS["admin_host"], port=SETTINGS["admin_port"], allow_unsafe_werkzeug=True)

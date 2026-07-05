@@ -3,7 +3,8 @@
 A DIY wireless tally light system for Blackmagic ATEM video switchers. A Raspberry Pi reads the current program input from the ATEM, publishes tally states over MQTT, and ESP8266-based tally lights subscribe to their assigned MQTT topics.
 
 > [!WARNING]
-> Some code and variable names are still German, and a few IP addresses are currently hardcoded. The documentation below describes the project as it exists today.
+> [!NOTE]
+> Some code and variable names are still German. Runtime network and service settings are configured through `config/config.json` or environment variables.
 
 ## What It Does
 
@@ -84,13 +85,83 @@ These values are used by the current code and examples:
 | Client dashboard | `http://192.168.4.1:1234` |
 | Friendly client URL | `http://tally.local` |
 
-Change the matching values in the Python and Arduino files if your network uses different addresses.
+Change Raspberry Pi server values in `config/config.json` (next to `main.py` on the Pi, or `src/RPI Python code/config/config.json` in this repo) if your network uses different addresses. ESP firmware Wi-Fi and MQTT values are still compile-time settings in the Arduino sketch.
+
+## Server Configuration
+
+The Raspberry Pi server reads runtime settings from `config/config.json`. Existing camera and tally assignments are stored in the same file, while server settings live under `Settings`:
+
+```json
+{
+  "Settings": {
+    "atem_ip": "192.168.2.10",
+    "mqtt_host": "127.0.0.1",
+    "mqtt_port": 1883,
+    "admin_host": "0.0.0.0",
+    "admin_port": 4321,
+    "client_host": "0.0.0.0",
+    "client_port": 1234,
+    "camera_count": 8,
+    "program_color": "#ff0000",
+    "preview_color": "#00ff00",
+    "off_color": "#000000",
+    "identify_color": "#c832c8"
+  }
+}
+```
+
+Supported environment overrides:
+
+| Environment variable | Setting |
+| --- | --- |
+| `TALLY_ATEM_IP` | ATEM switcher IP |
+| `TALLY_MQTT_HOST` | MQTT broker host used by the Python server |
+| `TALLY_MQTT_PORT` | MQTT broker port |
+| `TALLY_ADMIN_HOST` | Admin dashboard bind address |
+| `TALLY_ADMIN_PORT` | Admin dashboard port |
+| `TALLY_CLIENT_HOST` | Client dashboard bind address |
+| `TALLY_CLIENT_PORT` | Client dashboard port |
+| `TALLY_CAMERA_COUNT` | Default number of cameras when no saved camera list exists |
+| `TALLY_PROGRAM_COLOR` | Color for the active Program camera |
+| `TALLY_PREVIEW_COLOR` | Color for the active Preview camera |
+| `TALLY_OFF_COLOR` | Color for assigned cameras that are neither Program nor Preview |
+| `TALLY_IDENTIFY_COLOR` | Temporary color used by the admin identify/test action |
+
+Missing values fall back to the documented defaults. Invalid numeric values print a warning and fall back to the safe default for that setting.
 
 ## Raspberry Pi Setup
 
 The project was tested on a Raspberry Pi 3B with Raspberry Pi OS Lite. When imaging the SD card, do not configure the Pi's Wi-Fi as a normal client network. The Pi needs `wlan0` for its own access point.
 
 Connect to the Pi via Ethernet/SSH for the initial setup.
+
+### Quick Server Install
+
+Clone the repository and run the installer:
+
+```bash
+git clone https://github.com/thescripter1/ESP_Tally_Lights.git ~/ESP_Tally_Lights
+cd ~/ESP_Tally_Lights
+./scripts/install_rpi.sh
+```
+
+The script installs apt/Python dependencies, copies the Python server to `~/tally-lights-server`, creates runtime folders, installs a `tally-lights.service` systemd unit, enables it, starts Mosquitto, and restarts the tally server. It is safe to re-run; existing `config/config.json` remains in the server directory and is reused.
+
+Override the install target or service name if needed:
+
+```bash
+SERVER_DIR=/opt/tally-lights-server SERVICE_NAME=tally-lights ./scripts/install_rpi.sh
+```
+
+After installation:
+
+```bash
+sudo systemctl status tally-lights
+```
+
+Then continue with the Wi-Fi access point and Ethernet setup sections below if the Pi network has not been configured yet.
+
+### Manual Install
 
 ### 1. Update the System
 
@@ -430,7 +501,7 @@ mosquitto_pub -h 127.0.0.1 -t "tally/lights/A" -m "#ff0000"
 
 ## Ethernet Setup for the ATEM
 
-The current Python code connects to the ATEM at `192.168.2.10`. The documented Pi Ethernet address is `192.168.2.11/24`.
+By default, the Python server connects to the ATEM at `192.168.2.10`. Set `Settings.atem_ip` or `TALLY_ATEM_IP` when your switcher uses another address. The documented Pi Ethernet address is `192.168.2.11/24`.
 
 On Raspberry Pi OS images using NetworkManager, list connections:
 
@@ -466,11 +537,11 @@ cd ~
 python3 ~/tally-lights-server/main.py
 ```
 
-The server starts three components:
+The server starts three components using the values from `config/config.json`:
 
 - Admin dashboard: `http://192.168.4.1:4321`
 - Client dashboard: `http://192.168.4.1:1234`
-- ATEM listener, connecting to `192.168.2.10`
+- ATEM listener, connecting to `Settings.atem_ip`
 
 Open the admin dashboard from a phone or laptop connected to the `Tally-Lights` Wi-Fi network. Use it to assign detected tally IDs to camera numbers.
 
@@ -587,10 +658,13 @@ Adjust these values to match your hardware.
 The ESP firmware accepts six-digit hex colors:
 
 ```text
-#ff0000  red/live
-#000000  off
-#c832c8  purple identify/mark light
+#ff0000  Program/live by default
+#00ff00  Preview/next by default
+#000000  Off by default
+#c832c8  Identify/mark light by default
 ```
+
+When a camera is both Program and Preview, Program has priority. The Raspberry Pi server only sends a new MQTT color command when the target color for a tally light changes.
 
 Topics:
 
@@ -600,6 +674,12 @@ Topics:
 | `tally/lights/status` | ESP to Pi | Heartbeat containing the ESP ID |
 
 The admin dashboard uses the heartbeat topic to show available tally lights.
+
+## Runtime Resilience
+
+The Raspberry Pi server reconnects to MQTT automatically and subscribes to the tally light heartbeat topic again after reconnect. The ATEM listener also retries after connection loss or switcher reboot without requiring a Python server restart.
+
+ESP tally lights send a heartbeat every 10 seconds. The admin dashboard marks a light offline when no heartbeat has been received for 30 seconds. When Wi-Fi or MQTT comes back, ESP lights reconnect and resubscribe to their `tally/lights/<ID>` topic.
 
 ## Dashboards
 
@@ -677,7 +757,7 @@ Check that the ATEM is reachable from the Pi:
 ping 192.168.2.10
 ```
 
-If your ATEM uses another IP address, update it in `src/RPI Python code/ATEM.py`.
+If your ATEM uses another IP address, update `Settings.atem_ip` in `src/RPI Python code/config/config.json` or set `TALLY_ATEM_IP`.
 
 ### The Python server cannot find the config or chat file
 

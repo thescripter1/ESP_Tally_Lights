@@ -4,6 +4,7 @@ from pathlib import Path
 import threading
 import time
 from shared_state import get_Kamera, get_Liste
+from settings import SETTINGS
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -50,4 +51,4 @@ def _watcher():
 def run():
     _register_routes()
     threading.Thread(target=_watcher, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=1234, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=SETTINGS["client_host"], port=SETTINGS["client_port"], allow_unsafe_werkzeug=True)

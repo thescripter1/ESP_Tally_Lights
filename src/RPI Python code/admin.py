@@ -4,7 +4,7 @@ from pathlib import Path
 import threading
 import time
 
-from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, set_Pool, get_Mode, set_Mode
+from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, get_Mode, set_Mode
 from tally import makeLila, get_device_statuses, get_visible_pool
 from settings import SETTINGS
 

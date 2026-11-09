@@ -150,7 +150,7 @@ cd ~/ESP_Tally_Lights
 ./scripts/install_rpi.sh
 ```
 
-The script installs apt/Python dependencies, copies the Python server to `~/tally-lights-server`, creates runtime folders, installs a `tally-lights.service` systemd unit, enables it, starts Mosquitto, and restarts the tally server. It is safe to re-run; existing `config/config.json` remains in the server directory and is reused.
+The script installs apt/Python dependencies, copies the Python server to `~/tally-lights-server`, creates runtime folders, installs a `tally-lights.service` systemd unit, enables it, starts Mosquitto, and restarts the tally server. It is safe to re-run; existing `config/config.json` and `chats/chat.jsonl` stay in place. A fresh installation starts with the default configuration and an empty chat history.
 
 Override the install target or service name if needed:
 

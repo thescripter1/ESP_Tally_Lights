@@ -31,6 +31,7 @@ def _state_payload():
         "Liste": get_Liste(),
         "TallyPool": Pool,
         "Pool": Pool,
+        "Devices": get_device_statuses(),
         "Mode": get_Mode(),
     }
 

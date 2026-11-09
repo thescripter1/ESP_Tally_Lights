@@ -1,18 +1,9 @@
 import time
 import random
-from shared_state import get_Mode, set_Kamera
+from shared_state import get_Kamera, get_Mode, set_Kamera
 from tally import randomize_test_devices, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
-
-
-def _sleep_while_mode(mode, seconds):
-    end_time = time.time() + seconds
-    while time.time() < end_time:
-        if get_Mode() != mode:
-            return False
-        time.sleep(min(0.2, end_time - time.time()))
-    return True
 
 
 def _run_test_mode():
@@ -52,6 +43,8 @@ def _run_production_mode():
 
             last_program = None
             while get_Mode() == "production":
+                if not switcher.connected:
+                    raise ConnectionError("ATEM antwortet nicht mehr")
                 program = switcher.programInput[0].videoSource.value
                 preview = switcher.previewInput[0].videoSource.value
                 if program != last_program:
@@ -67,8 +60,13 @@ def _run_production_mode():
             except Exception:
                 pass
             if get_Mode() == "production":
+                if get_Kamera() != 0:
+                    set_Kamera(0)
+                retry_at = time.monotonic() + reconnect_delay
                 print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
-                _sleep_while_mode("production", reconnect_delay)
+                while get_Mode() == "production" and time.monotonic() < retry_at:
+                    update_tally_states(0)
+                    time.sleep(0.1)
 
 
 def run():

@@ -1,7 +1,7 @@
 import time
 import random
 from shared_state import get_Mode, set_Kamera
-from tally import makeDark, randomize_test_devices, update_tally_states
+from tally import randomize_test_devices, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
 
@@ -16,52 +16,27 @@ def _sleep_while_mode(mode, seconds):
 
 
 def _run_test_mode():
-    last_src = 0
-    last_device_shuffle = 0
+    next_camera_change = 0
+    next_device_shuffle = 0
     max_camera = SETTINGS["camera_count"]
-    current_input = random.randint(1, max_camera)
+    current_input = 0
 
     while get_Mode() == "test":
-        now = time.time()
-        if now - last_device_shuffle > 10:
+        now = time.monotonic()
+        if now >= next_device_shuffle:
             randomize_test_devices()
-            last_device_shuffle = now
+            next_device_shuffle = now + 10
+        if now >= next_camera_change:
+            new_input = random.randint(1, max_camera)
+            if max_camera > 1:
+                while new_input == current_input:
+                    new_input = random.randint(1, max_camera)
+            current_input = new_input
+            set_Kamera(current_input)
+            next_camera_change = now + random.randint(2, 5)
+        update_tally_states(current_input)
+        time.sleep(0.1)
 
-        if not _sleep_while_mode("test", random.randint(2, 5)):
-            return
-
-        # Neuen Input wählen (aber nicht gleichen wie vorher)
-        new_input = current_input
-        if max_camera > 1:
-            while new_input == current_input:
-                new_input = random.randint(1, max_camera)
-
-        set_Kamera(new_input)
-        current_input = new_input
-
-        src = new_input
-
-        if src != last_src:
-            # Alten Port ausschalten, wenn gültig
-            if last_src <= max_camera:
-                makeDark(last_src)
-
-            # Neuen Port aktivieren, wenn gültig
-            if src <= max_camera:
-                update_tally_states(src)
-            else:
-                print(f"Achtung: src={src} außerhalb der konfigurierten Kameras ({max_camera}). Ignoriere Aktivierung.")
-
-            last_src = src
-
-
-"""
-class ReadAtem:
-    def __init__():
-        #ATEM Switcher Konfigurieren
-        switcher = PyATEMMax.ATEMMax()
-        switcher.connect(SETTINGS["atem_ip"])
-        switcher.waitForConnection()"""
 
 def _run_production_mode():
     reconnect_delay = 3
@@ -75,26 +50,15 @@ def _run_production_mode():
                 raise TimeoutError("ATEM Verbindung konnte nicht innerhalb des Timeouts hergestellt werden")
             print("ATEM Verbindung hergestellt")
 
-            max_camera = SETTINGS["camera_count"]
-            last_program = switcher.programInput[0].videoSource.value
-            last_preview = switcher.previewInput[0].videoSource.value
-            set_Kamera(last_program)
-            update_tally_states(last_program, last_preview)
-
+            last_program = None
             while get_Mode() == "production":
-                program_src = switcher.programInput[0].videoSource.value
-                preview_src = switcher.previewInput[0].videoSource.value
-                if program_src != last_program or preview_src != last_preview:
-                    if program_src <= max_camera:
-                        update_tally_states(program_src, preview_src)
-                        set_Kamera(program_src)
-                    else:
-                        print(f"Achtung: src={program_src} außerhalb der konfigurierten Kameras ({max_camera}). Ignoriere Aktivierung.")
-
-                    last_program = program_src
-                    last_preview = preview_src
-
-                time.sleep(0.05)
+                program = switcher.programInput[0].videoSource.value
+                preview = switcher.previewInput[0].videoSource.value
+                if program != last_program:
+                    set_Kamera(program)
+                    last_program = program
+                update_tally_states(program, preview)
+                time.sleep(0.1)
         except Exception as error:
             print(f"ATEM Verbindung verloren oder fehlgeschlagen: {error}")
         finally:

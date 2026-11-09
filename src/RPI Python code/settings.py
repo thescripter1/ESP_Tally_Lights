@@ -1,5 +1,7 @@
 import json
 import os
+import re
+from ipaddress import ip_address
 from pathlib import Path
 
 
@@ -47,7 +49,10 @@ def _read_config_file():
 
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as file:
-            return json.load(file)
+            data = json.load(file)
+        if isinstance(data, dict):
+            return data
+        print("Warnung: config.json muss ein Objekt sein. Nutze Standardwerte.")
     except OSError as error:
         print(f"Warnung: config.json konnte nicht gelesen werden: {error}")
     except json.JSONDecodeError as error:
@@ -56,18 +61,37 @@ def _read_config_file():
     return {}
 
 
-def _coerce_int(name, value, fallback):
-    try:
-        converted = int(value)
-    except (TypeError, ValueError):
-        print(f"Warnung: Ungültiger Wert für {name!r}: {value!r}. Nutze Standard {fallback!r}.")
-        return fallback
-
-    if converted <= 0:
-        print(f"Warnung: {name!r} muss größer als 0 sein. Nutze Standard {fallback!r}.")
-        return fallback
-
-    return converted
+def validate_setting(name, value):
+    text = str(value).strip()
+    if name in INT_FIELDS:
+        try:
+            number = int(text)
+        except ValueError:
+            number = 0
+        if number > 0 and (not name.endswith("_port") or number <= 65535):
+            return number
+    elif name.endswith("_color"):
+        if re.fullmatch(r"#[0-9a-fA-F]{6}", text):
+            return text
+    elif name == "operating_mode":
+        if text in {"production", "test"}:
+            return text
+    elif name == "atem_ip":
+        try:
+            return str(ip_address(text))
+        except ValueError:
+            pass
+    elif name.endswith("_host"):
+        try:
+            return str(ip_address(text))
+        except ValueError:
+            labels = text.removesuffix(".").split(".")
+            if len(text) <= 253 and all(
+                re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?", label)
+                for label in labels
+            ) and not all(label.isdigit() for label in labels):
+                return text
+    raise ValueError(f"Ungültiger Wert für {name}: {value!r}")
 
 
 def _validated(settings):
@@ -78,12 +102,10 @@ def _validated(settings):
             print(f"Warnung: Unbekannte Einstellung {key!r} in config.json wird ignoriert.")
             continue
 
-        if key in INT_FIELDS:
-            result[key] = _coerce_int(key, value, DEFAULT_SETTINGS[key])
-        elif value is None or str(value).strip() == "":
-            print(f"Warnung: Leerer Wert für {key!r}. Nutze Standard {DEFAULT_SETTINGS[key]!r}.")
-        else:
-            result[key] = str(value).strip()
+        try:
+            result[key] = validate_setting(key, value)
+        except ValueError as error:
+            print(f"Warnung: {error}. Nutze Standard {result[key]!r}.")
 
     return result
 
@@ -92,7 +114,7 @@ def load_settings():
     config = _read_config_file()
     settings = config.get("Settings", {})
 
-    if settings and not isinstance(settings, dict):
+    if not isinstance(settings, dict):
         print("Warnung: 'Settings' in config.json muss ein Objekt sein. Nutze Standardwerte.")
         settings = {}
 

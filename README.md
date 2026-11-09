@@ -132,7 +132,7 @@ Supported environment overrides:
 | `TALLY_IDENTIFY_COLOR` | Temporary color used by the admin identify/test action |
 | `TALLY_OPERATING_MODE` | Fallback mode when no saved `Mode` exists (`production` or `test`) |
 
-Missing values fall back to the documented defaults. Invalid numeric values print a warning and fall back to the safe default for that setting.
+Missing values fall back to the documented defaults. Invalid settings print a warning and use the corresponding default. Ports must be between 1 and 65535, the camera count must be positive, and colors use `#RRGGBB`. Use a numeric IP address for the ATEM and a hostname or IP address for the service hosts. ESP Wi-Fi credentials and broker address remain compile-time settings.
 
 ## Raspberry Pi Setup
 

@@ -5,6 +5,7 @@ import threading
 import time
 
 from shared_state import get_Kamera, set_Liste, get_Liste, get_Pool, get_Mode, set_Mode
+from shared_state import get_server_settings, set_server_settings
 from tally import makeLila, get_device_statuses, get_visible_pool
 from settings import SETTINGS
 
@@ -41,7 +42,17 @@ def _register_routes():
 
     @socketio.on("connect")
     def handle_connect():
-        socketio.emit("Update", _state_payload())
+        emit("Update", _state_payload())
+        emit("server_settings", get_server_settings())
+
+    @socketio.on("save_server_settings")
+    def handle_server_settings(values):
+        try:
+            set_server_settings(values)
+            emit("server_settings", get_server_settings())
+            emit("server_settings_status", {"message": "Gespeichert. Änderungen gelten nach dem Neustart."})
+        except (ValueError, OSError) as error:
+            emit("server_settings_status", {"message": f"Speichern fehlgeschlagen: {error}"})
 
     @socketio.on("admin_command")
     def handle_admin(Liste):
@@ -64,7 +75,7 @@ def _register_routes():
             socketio.emit("Update", _state_payload())
             emit("mode_status", {"ok": True, "mode": get_Mode(), "message": "Modus gespeichert"})
         except Exception as error:
-            emit("mode_status", {"ok": False, "message": str(error)})
+            emit("mode_status", {"ok": False, "mode": get_Mode(), "message": str(error)})
 
     @socketio.on("chat")
     def handle_mesaage(nachricht):

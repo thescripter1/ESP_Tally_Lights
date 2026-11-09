@@ -110,6 +110,25 @@
             justify-content: flex-end;
         }
 
+        .server-settings-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .server-settings-fields label {
+            display: grid;
+            gap: 4px;
+        }
+
+        .server-settings-fields input {
+            width: 100%;
+            min-width: 0;
+            padding: 8px;
+            font: inherit;
+        }
+
         .mode-control {
             display: inline-flex;
             align-items: center;
@@ -658,6 +677,24 @@
             </div>
         </section>
 
+        <section class="panel">
+            <details>
+                <summary>Server-Einstellungen</summary>
+                <form id="server-settings">
+                    <p>Änderungen gelten nach dem Neustart. Umgebungsvariablen haben Vorrang.</p>
+                    <div class="server-settings-fields">
+                        <label>ATEM-IP <input name="atem_ip" required></label>
+                        <label>MQTT-Host <input name="mqtt_host" required></label>
+                        <label>MQTT-Port <input name="mqtt_port" type="number" min="1" max="65535" required></label>
+                        <label>Admin-Port <input name="admin_port" type="number" min="1" max="65535" required></label>
+                        <label>Client-Port <input name="client_port" type="number" min="1" max="65535" required></label>
+                    </div>
+                    <button class="btn" type="submit" disabled>Server-Einstellungen speichern</button>
+                    <p id="server-settings-status" role="status"></p>
+                </form>
+            </details>
+        </section>
+
         <section class="chat list-chat-card">
             <div class="chat__header">
                 <h2>Chat</h2>
@@ -1113,6 +1150,30 @@
             closeMenu();
         });
 
+        const serverSettings = document.getElementById("server-settings");
+        const serverSettingsStatus = document.getElementById("server-settings-status");
+        const serverSettingsSubmit = serverSettings.querySelector("button");
+        serverSettings.addEventListener("submit", (event) => {
+            event.preventDefault();
+            serverSettingsSubmit.disabled = true;
+            serverSettingsStatus.textContent = "Speichert …";
+            socket.emit("save_server_settings", Object.fromEntries(new FormData(serverSettings)));
+        });
+        socket.on("server_settings", (settings) => {
+            for (const [name, value] of Object.entries(settings)) {
+                serverSettings.elements.namedItem(name).value = value;
+            }
+            serverSettingsSubmit.disabled = false;
+        });
+        socket.on("server_settings_status", ({ message }) => {
+            serverSettingsStatus.textContent = message;
+            serverSettingsSubmit.disabled = false;
+        });
+        socket.on("disconnect", () => {
+            serverSettingsSubmit.disabled = true;
+            serverSettingsStatus.textContent = "Verbindung getrennt.";
+        });
+
         socket.on("connect", () => setChatStatus(true));
         socket.on("disconnect", () => setChatStatus(false));
 
@@ -1166,8 +1227,8 @@
         });
 
         socket.on("mode_status", (status) => {
+            if (status?.mode) applyMode(status.mode);
             if (status?.ok) {
-                applyMode(status.mode);
                 setSaveStatus(status.message || "Modus gespeichert", "ok");
                 return;
             }

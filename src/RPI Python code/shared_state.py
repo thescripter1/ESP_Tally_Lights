@@ -1,7 +1,10 @@
 import json
-from multiprocessing import Manager
+import copy
+import os
+import tempfile
+import threading
 
-from settings import CONFIG_FILE, SETTINGS
+from settings import CONFIG_FILE, DEFAULT_SETTINGS, SETTINGS, validate_setting
 
 MODE_VALUES = {"production", "test"}
 
@@ -29,7 +32,7 @@ def default_state():
         },
         "TallyPool": [],
         "Mode": _validated_mode(SETTINGS["operating_mode"]),
-        "Settings": SETTINGS,
+        "Settings": {},
     }
 
 
@@ -38,10 +41,16 @@ def load_state():
         try:
             with CONFIG_FILE.open("r", encoding="utf-8") as file:
                 data = json.load(file)
-            if not all(key in data for key in ["Kamera", "Liste", "TallyPool"]):
-                raise ValueError("Pflichtfelder Kamera, Liste oder TallyPool fehlen")
+            if not isinstance(data, dict):
+                raise ValueError("config.json muss ein Objekt sein")
+            data = {**default_state(), **data}
+            if not isinstance(data["Liste"], dict) or not isinstance(data["Liste"].get("cameras"), list):
+                data["Liste"] = default_state()["Liste"]
+            if not isinstance(data["TallyPool"], list):
+                data["TallyPool"] = []
             data["Mode"] = _validated_mode(data.get("Mode", SETTINGS["operating_mode"]))
-            data["Settings"] = SETTINGS
+            if not isinstance(data.get("Settings"), dict):
+                data["Settings"] = {}
             return data
         except json.JSONDecodeError as error:
             print(f"Warnung: config.json ist ungültig. Lade Standardwerte. Fehler: {error}")
@@ -52,57 +61,88 @@ def load_state():
 
 
 def save_state(state_dict):
-    try:
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        state_dict["Settings"] = SETTINGS
-        with CONFIG_FILE.open("w", encoding="utf-8") as file:
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=CONFIG_FILE.parent, delete=False
+    ) as file:
+        temp_path = file.name
+        try:
             json.dump(state_dict, file, indent=4)
-    except OSError as error:
-        print(f"Warnung: config.json konnte nicht gespeichert werden: {error}")
+            file.flush()
+            os.replace(temp_path, CONFIG_FILE)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
 
-manager = Manager()
-state = manager.dict(load_state())
+_state_lock = threading.RLock()
+state = load_state()
+
+
+def _set_state(key, value, require_save=False):
+    with _state_lock:
+        updated_state = {**state, key: value}
+        try:
+            save_state(updated_state)
+        except OSError as error:
+            if require_save:
+                raise
+            print(f"Warnung: config.json konnte nicht gespeichert werden: {error}")
+        state[key] = copy.deepcopy(value)
 
 
 def set_Kamera(kamera):
-    state["Kamera"] = kamera
-    save_state(dict(state))
-    print("Kamera geändert auf:", kamera)
+    _set_state("Kamera", kamera)
 
 
 def get_Kamera():
-    return state["Kamera"]
+    with _state_lock:
+        return state["Kamera"]
 
 
 def set_Liste(lst):
-    state["Liste"] = lst
-    save_state(dict(state))
-    print("Liste geändert auf:", lst)
+    _set_state("Liste", lst, require_save=True)
 
 
 def get_Liste():
-    return state["Liste"]
+    with _state_lock:
+        return copy.deepcopy(state["Liste"])
 
 
 def set_Pool(pool):
-    state["TallyPool"] = pool
-    save_state(dict(state))
-    print("TallyPool geändert auf:", pool)
+    _set_state("TallyPool", pool)
 
 
 def get_Pool():
-    return state["TallyPool"]
+    with _state_lock:
+        return list(state["TallyPool"])
 
 
 def set_Mode(mode):
-    state["Mode"] = _validated_mode(mode)
-    save_state(dict(state))
-    print("Modus geändert auf:", state["Mode"])
+    if mode not in MODE_VALUES:
+        raise ValueError("Bitte Produktion oder Test wählen.")
+    _set_state("Mode", mode, require_save=True)
 
 
 def get_Mode():
-    return _validated_mode(state.get("Mode", SETTINGS["operating_mode"]))
+    with _state_lock:
+        return _validated_mode(state.get("Mode", SETTINGS["operating_mode"]))
 
 
-print("Liste:   ", get_Liste())
+ADMIN_SETTINGS = ("atem_ip", "mqtt_host", "mqtt_port", "admin_port", "client_port")
+
+
+def get_server_settings():
+    with _state_lock:
+        return {
+            name: state["Settings"].get(name, DEFAULT_SETTINGS[name])
+            for name in ADMIN_SETTINGS
+        }
+
+
+def set_server_settings(values):
+    if not isinstance(values, dict) or values.keys() != set(ADMIN_SETTINGS):
+        raise ValueError("Die Server-Einstellungen sind unvollständig.")
+    validated = {name: validate_setting(name, value) for name, value in values.items()}
+    with _state_lock:
+        _set_state("Settings", {**state["Settings"], **validated}, require_save=True)

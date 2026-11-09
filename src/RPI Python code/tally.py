@@ -1,5 +1,6 @@
 import time
 import random
+import threading
 import paho.mqtt.client as mqtt
 from shared_state import get_Liste, get_Mode, set_Pool
 from settings import SETTINGS
@@ -12,6 +13,9 @@ connected_devices = set()
 device_last_seen = {}
 test_connected_devices = {}
 last_light_colors = {}
+_tally_lock = threading.RLock()
+_tally_colors = {}
+_identifying = {}
 DEVICE_TIMEOUT_SECONDS = 30
 TEST_DEVICE_IDS = tuple("ABCDEFGHJKLMNPQRSTUVWXYZ")
 
@@ -117,17 +121,35 @@ def update_tally_states(program_camera, preview_camera=0):
         if priority >= current_priority:
             target_colors[address] = (color, priority)
 
-    for address, (color, _) in target_colors.items():
-        char = address.rsplit("/", 1)[-1]
-        _publish_light(char, color)
+    with _tally_lock:
+        previous_devices = set(_tally_colors)
+        _tally_colors.update({address: color for address, (color, _) in target_colors.items()})
+        for address in previous_devices - target_colors.keys():
+            _tally_colors[address] = SETTINGS["off_color"]
+
+        for address, color in list(_tally_colors.items()):
+            char = address.rsplit("/", 1)[-1]
+            if char in _identifying:
+                continue
+            _publish_light(char, color)
+            if address not in target_colors and last_light_colors.get(address) == color:
+                del _tally_colors[address]
 
 
 def makeLila(char):
-    print("Folgendes Licht leuchtet nun für 2 Sekunden Lila:", char)
-    adress = f"tally/lights/{char}"
-    _publish_light(char, SETTINGS["identify_color"], force=True)
+    if not isinstance(char, str) or not _is_assigned_tally(char):
+        return
+    deadline = time.monotonic() + 2
+    with _tally_lock:
+        _identifying[char] = deadline
+        _publish_light(char, SETTINGS["identify_color"], force=True)
     time.sleep(2)
-    _publish_light(char, SETTINGS["off_color"], force=True)
+    with _tally_lock:
+        if _identifying.get(char) == deadline:
+            del _identifying[char]
+            address = f"tally/lights/{char}"
+            _publish_light(char, _tally_colors.get(address, SETTINGS["off_color"]))
+
 
 def make_Farbe(char, farbe):
     _publish_light(char, farbe, force=True)

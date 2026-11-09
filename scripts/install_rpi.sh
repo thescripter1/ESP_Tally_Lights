@@ -34,28 +34,14 @@ then
 fi
 
 echo "Kopiere Serverdateien nach ${SERVER_DIR}..."
-mkdir -p "${SERVER_DIR}"
-CONFIG_BACKUP="$(mktemp)"
-CHAT_BACKUP="$(mktemp)"
-CONFIG_EXISTS=0
-CHAT_EXISTS=0
-if [[ -f "${SERVER_DIR}/config/config.json" ]]; then
-  cp "${SERVER_DIR}/config/config.json" "${CONFIG_BACKUP}"
-  CONFIG_EXISTS=1
-fi
-if [[ -f "${SERVER_DIR}/chats/chat.jsonl" ]]; then
-  cp "${SERVER_DIR}/chats/chat.jsonl" "${CHAT_BACKUP}"
-  CHAT_EXISTS=1
-fi
-cp -a "${SOURCE_DIR}/." "${SERVER_DIR}/"
 mkdir -p "${SERVER_DIR}/config" "${SERVER_DIR}/chats"
-if [[ "${CONFIG_EXISTS}" -eq 1 ]]; then
-  cp "${CONFIG_BACKUP}" "${SERVER_DIR}/config/config.json"
+for source in "${SOURCE_DIR}"/*.py "${SOURCE_DIR}/static"; do
+  cp -a "${source}" "${SERVER_DIR}/"
+done
+if [[ ! -e "${SERVER_DIR}/config/config.json" ]]; then
+  cp "${SOURCE_DIR}/config/config.json" "${SERVER_DIR}/config/config.json"
 fi
-if [[ "${CHAT_EXISTS}" -eq 1 ]]; then
-  cp "${CHAT_BACKUP}" "${SERVER_DIR}/chats/chat.jsonl"
-fi
-rm -f "${CONFIG_BACKUP}" "${CHAT_BACKUP}"
+touch "${SERVER_DIR}/chats/chat.jsonl"
 
 echo "Erzeuge systemd-Service ${SERVICE_FILE}..."
 sudo tee "${SERVICE_FILE}" >/dev/null <<SERVICE

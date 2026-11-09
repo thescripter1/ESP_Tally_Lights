@@ -132,7 +132,7 @@ Supported environment overrides:
 | `TALLY_IDENTIFY_COLOR` | Temporary color used by the admin identify/test action |
 | `TALLY_OPERATING_MODE` | Fallback mode when no saved `Mode` exists (`production` or `test`) |
 
-Missing values fall back to the documented defaults. Invalid settings print a warning and use the corresponding default. Ports must be between 1 and 65535, the camera count must be positive, and colors use `#RRGGBB`. Use a numeric IP address for the ATEM and a hostname or IP address for the service hosts. ESP Wi-Fi credentials and broker address remain compile-time settings.
+Missing values fall back to the documented defaults. Invalid settings print a warning and use the corresponding default. Ports must be between 1 and 65535, the camera count must be positive, and colors use `#RRGGBB`. Use an IPv4 address or hostname for the ATEM, and a hostname or IP address for the service hosts. ESP Wi-Fi credentials and broker address remain compile-time settings.
 
 ## Raspberry Pi Setup
 
@@ -682,7 +682,7 @@ The admin dashboard uses the heartbeat topic to show available tally lights.
 
 ## Runtime Resilience
 
-The Raspberry Pi server reconnects to MQTT automatically and subscribes to the tally light heartbeat topic again after reconnect. The ATEM listener also retries after connection loss or switcher reboot without requiring a Python server restart.
+The Raspberry Pi server reconnects to MQTT automatically, resubscribes to heartbeats, and republishes current tally colors. The broker retains those colors so an ESP gets its last tally state when it resubscribes. Identify flashes are temporary and are never retained. The ATEM listener clears the tallies when it detects a disconnect and retries without restarting the server. Tally devices are marked offline after 30 seconds without a heartbeat.
 
 ESP tally lights send a heartbeat every 10 seconds. The admin dashboard marks a light offline when no heartbeat has been received for 30 seconds. When Wi-Fi or MQTT comes back, ESP lights reconnect and resubscribe to their `tally/lights/<ID>` topic.
 

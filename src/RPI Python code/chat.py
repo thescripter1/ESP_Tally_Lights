@@ -24,7 +24,7 @@ def get_latest_message():
     try:
         with CHAT_FILE.open("r", encoding="utf-8") as f:
             messages = convert_to_json(f)
-    except OSError as error:
+    except (OSError, UnicodeError) as error:
         print(f"Warnung: Chat-Datei konnte nicht gelesen werden: {error}")
         return None
 

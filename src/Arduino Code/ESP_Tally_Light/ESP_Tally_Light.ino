@@ -14,6 +14,10 @@ unsigned long lastHeartbeat = 0;       // Zeitpunkt der letzten Nachricht
 const unsigned long heartbeatInterval = 10000; // 10 Sekunden
 unsigned long lastWifiReconnectAttempt = 0;
 const unsigned long wifiReconnectInterval = 5000;
+unsigned long lastMqttReconnectAttempt = 0;
+const unsigned long mqttReconnectInterval = 5000;
+bool wifiWasConnected = false;
+bool mqttAttempted = false;
 
 CRGB leds[NUM_LEDS];
 uint8_t gHue = 0; // Globale Farbabstufung (Hue)
@@ -49,39 +53,33 @@ void setup_wifi() {
 
   WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    fill_solid(leds, NUM_LEDS, CRGB(0, 0, 255));
-    FastLED.show();
-    delay(1000);
-    Serial.print(".");
-    fill_solid(leds, NUM_LEDS, CRGB::Black);
-    FastLED.show();
-    delay(1000);
-  }
-
-  Serial.println("");
-  Serial.println("WLAN verbunden!");
-  fill_solid(leds, NUM_LEDS, CRGB(0, 255, 0));
-  FastLED.show();
-  Serial.println("IP-Adresse: ");
-  Serial.println(WiFi.localIP());
+  lastWifiReconnectAttempt = millis();
 }
 
 bool ensure_wifi() {
   if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiWasConnected) {
+      wifiWasConnected = true;
+      Serial.print("WLAN verbunden: ");
+      Serial.println(WiFi.localIP());
+    }
     return true;
   }
 
-  unsigned long now = millis();
-  if (now - lastWifiReconnectAttempt > wifiReconnectInterval) {
-    lastWifiReconnectAttempt = now;
-    Serial.println("WLAN getrennt, versuche Reconnect...");
-    WiFi.disconnect();
-    WiFi.begin(ssid, password);
+  if (wifiWasConnected) {
+    wifiWasConnected = false;
+    espClient.stop();
+    mqttAttempted = false;
+    Serial.println("WLAN getrennt");
+    fill_solid(leds, NUM_LEDS, CRGB(0, 0, 255));
+    FastLED.show();
   }
 
-  fill_solid(leds, NUM_LEDS, CRGB(0, 0, 255));
-  FastLED.show();
+  unsigned long now = millis();
+  if (now - lastWifiReconnectAttempt >= wifiReconnectInterval) {
+    lastWifiReconnectAttempt = now;
+    WiFi.reconnect();
+  }
   return false;
 }
 
@@ -109,19 +107,30 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Verbindung zu MQTT Broker...");
-    if (client.connect((String("D1MiniTally") + character).c_str())) { // Korrigiert
-      Serial.println("Verbunden!");
-      client.subscribe(topic.c_str()); // Korrigiert
-    } else {
-      Serial.print("Fehler, rc=");
-      Serial.print(client.state());
-      Serial.println(" versuche erneut in 5 Sekunden");
-      delay(5000);
-    }
+bool ensure_mqtt() {
+  if (client.connected()) {
+    return true;
   }
+
+  unsigned long now = millis();
+  if (mqttAttempted && now - lastMqttReconnectAttempt < mqttReconnectInterval) {
+    return false;
+  }
+  mqttAttempted = true;
+  lastMqttReconnectAttempt = now;
+  Serial.println("Verbinde mit MQTT Broker...");
+  if (!client.connect((String("D1MiniTally") + character).c_str())) {
+    Serial.print("MQTT-Verbindung fehlgeschlagen, rc=");
+    Serial.println(client.state());
+    return false;
+  }
+  if (!client.subscribe(topic.c_str(), 1)) {
+    client.disconnect();
+    return false;
+  }
+  Serial.println("MQTT verbunden");
+  lastHeartbeat = millis() - heartbeatInterval;
+  return true;
 }
 
 void setup() {
@@ -135,16 +144,13 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+  client.setSocketTimeout(2);
 }
 
 void loop() {
-  if (!ensure_wifi()) {
+  if (!ensure_wifi() || !ensure_mqtt()) {
     delay(100);
     return;
-  }
-
-  if (!client.connected()) {
-    reconnect();
   }
   client.loop();
 

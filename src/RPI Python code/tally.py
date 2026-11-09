@@ -24,6 +24,8 @@ def on_connect(client, userdata, flags, rc, *args):
     if rc == 0:
         print(f"MQTT verbunden: {broker}:{SETTINGS['mqtt_port']}")
         client.subscribe("tally/lights/status")
+        with _tally_lock:
+            last_light_colors.clear()
     else:
         print(f"MQTT Verbindung fehlgeschlagen, rc={rc}")
 
@@ -36,12 +38,18 @@ def on_disconnect(client, userdata, rc, *args):
 
 
 def on_message(client, userdata, msg):
-    device_id = msg.payload.decode().strip()
+    try:
+        device_id = msg.payload.decode().strip()
+    except UnicodeDecodeError:
+        return
     if not device_id:
         return
-    connected_devices.add(device_id)
-    device_last_seen[device_id] = time.time()
-    set_Pool(list(connected_devices))
+    with _tally_lock:
+        is_new = device_id not in connected_devices
+        connected_devices.add(device_id)
+        device_last_seen[device_id] = (time.monotonic(), time.time())
+        if is_new:
+            set_Pool(sorted(connected_devices))
 
 
 client.on_message = on_message
@@ -65,7 +73,7 @@ def _is_assigned_tally(char):
     return char is not None and str(char).strip() not in {"", "0"}
 
 
-def _publish_light(char, code, force=False):
+def _publish_light(char, code, force=False, retain=True):
     if not _is_assigned_tally(char):
         return
 
@@ -73,8 +81,11 @@ def _publish_light(char, code, force=False):
     if not force and last_light_colors.get(address) == code:
         return
 
+    if not client.is_connected():
+        return
+
     try:
-        result = client.publish(address, code)
+        result = client.publish(address, code, qos=1, retain=retain)
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
             last_light_colors[address] = code
             print("Sende Code", code, "an", address)
@@ -142,7 +153,7 @@ def makeLila(char):
     deadline = time.monotonic() + 2
     with _tally_lock:
         _identifying[char] = deadline
-        _publish_light(char, SETTINGS["identify_color"], force=True)
+        _publish_light(char, SETTINGS["identify_color"], force=True, retain=False)
     time.sleep(2)
     with _tally_lock:
         if _identifying.get(char) == deadline:
@@ -162,16 +173,17 @@ def get_device_statuses():
     if get_Mode() == "test":
         return _get_test_device_statuses()
 
-    now = time.time()
-    statuses = []
-    for device_id in sorted(connected_devices):
-        last_seen = device_last_seen.get(device_id, 0)
-        statuses.append({
+    with _tally_lock:
+        seen = dict(device_last_seen)
+    now = time.monotonic()
+    return [
+        {
             "id": device_id,
             "online": now - last_seen <= DEVICE_TIMEOUT_SECONDS,
-            "lastSeen": last_seen,
-        })
-    return statuses
+            "lastSeen": seen_at,
+        }
+        for device_id, (last_seen, seen_at) in sorted(seen.items())
+    ]
 
 
 def randomize_test_devices():
@@ -180,32 +192,33 @@ def randomize_test_devices():
     count = random.randint(2, max_devices)
     selected = random.sample(TEST_DEVICE_IDS, count)
 
-    test_connected_devices.clear()
+    devices = {}
     for device_id in selected:
         online = random.random() > 0.2
-        test_connected_devices[device_id] = {
+        devices[device_id] = {
             "online": online,
             "lastSeen": now if online else now - random.randint(DEVICE_TIMEOUT_SECONDS + 5, DEVICE_TIMEOUT_SECONDS + 90),
         }
 
+    with _tally_lock:
+        test_connected_devices.clear()
+        test_connected_devices.update(devices)
+
 
 def get_visible_pool():
-    if get_Mode() == "test":
-        if not test_connected_devices:
-            randomize_test_devices()
-        return sorted(test_connected_devices)
-    return list(connected_devices)
+    with _tally_lock:
+        if get_Mode() == "test":
+            if not test_connected_devices:
+                randomize_test_devices()
+            return sorted(test_connected_devices)
+        return sorted(connected_devices)
 
 
 def _get_test_device_statuses():
-    if not test_connected_devices:
-        randomize_test_devices()
-
-    return [
-        {
-            "id": device_id,
-            "online": details["online"],
-            "lastSeen": details["lastSeen"],
-        }
-        for device_id, details in sorted(test_connected_devices.items())
-    ]
+    with _tally_lock:
+        if not test_connected_devices:
+            randomize_test_devices()
+        return [
+            {"id": device_id, **details}
+            for device_id, details in sorted(test_connected_devices.items())
+        ]

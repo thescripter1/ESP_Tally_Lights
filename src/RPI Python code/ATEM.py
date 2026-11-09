@@ -1,18 +1,9 @@
 import time
 import random
-from shared_state import get_Mode, set_Kamera
+from shared_state import get_Kamera, get_Mode, set_Kamera
 from tally import randomize_test_devices, update_tally_states
 from settings import SETTINGS
 import PyATEMMax
-
-
-def _sleep_while_mode(mode, seconds):
-    end_time = time.time() + seconds
-    while time.time() < end_time:
-        if get_Mode() != mode:
-            return False
-        time.sleep(min(0.2, end_time - time.time()))
-    return True
 
 
 def _run_test_mode():
@@ -39,36 +30,49 @@ def _run_test_mode():
 
 
 def _run_production_mode():
-    reconnect_delay = 3
-
     while get_Mode() == "production":
         switcher = PyATEMMax.ATEMMax()
         try:
-            print(f"Versuche Verbindung mit ATEM {SETTINGS['atem_ip']}")
-            switcher.connect(SETTINGS["atem_ip"], connTimeout=3)
-            if not switcher.waitForConnection(infinite=False):
-                raise TimeoutError("ATEM Verbindung konnte nicht innerhalb des Timeouts hergestellt werden")
-            print("ATEM Verbindung hergestellt")
+            print(f"Versuche Verbindung mit ATEM {SETTINGS['atem_ip']}", flush=True)
+            # PyATEMMax retries the handshake and reconnects on the same session.
+            switcher.connect(SETTINGS["atem_ip"])
 
+            was_connected = False
             last_program = None
             while get_Mode() == "production":
-                program = switcher.programInput[0].videoSource.value
-                preview = switcher.previewInput[0].videoSource.value
-                if program != last_program:
-                    set_Kamera(program)
-                    last_program = program
-                update_tally_states(program, preview)
+                connected = switcher.connected
+                if connected:
+                    if not was_connected:
+                        print("ATEM Verbindung hergestellt", flush=True)
+                    program = switcher.programInput[0].videoSource.value
+                    preview = switcher.previewInput[0].videoSource.value
+                    if program != last_program:
+                        set_Kamera(program)
+                        last_program = program
+                    update_tally_states(program, preview)
+                else:
+                    if was_connected:
+                        print("ATEM Verbindung verloren. Warte auf Wiederverbindung.", flush=True)
+                    if get_Kamera() != 0:
+                        set_Kamera(0)
+                    last_program = None
+                    update_tally_states(0)
+                was_connected = connected
                 time.sleep(0.1)
         except Exception as error:
-            print(f"ATEM Verbindung verloren oder fehlgeschlagen: {error}")
+            print(f"ATEM Fehler: {error}", flush=True)
         finally:
             try:
                 switcher.disconnect()
-            except Exception:
-                pass
-            if get_Mode() == "production":
-                print(f"ATEM reconnect in {reconnect_delay} Sekunden.")
-                _sleep_while_mode("production", reconnect_delay)
+            except Exception as error:
+                print(f"ATEM konnte nicht getrennt werden: {error}", flush=True)
+
+        retry_at = time.monotonic() + 3
+        while get_Mode() == "production" and time.monotonic() < retry_at:
+            if get_Kamera() != 0:
+                set_Kamera(0)
+            update_tally_states(0)
+            time.sleep(0.1)
 
 
 def run():

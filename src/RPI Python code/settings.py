@@ -55,7 +55,7 @@ def _read_config_file():
         print("Warnung: config.json muss ein Objekt sein. Nutze Standardwerte.")
     except OSError as error:
         print(f"Warnung: config.json konnte nicht gelesen werden: {error}")
-    except json.JSONDecodeError as error:
+    except (json.JSONDecodeError, UnicodeError) as error:
         print(f"Warnung: config.json ist ungültig: {error}")
 
     return {}
@@ -76,14 +76,11 @@ def validate_setting(name, value):
     elif name == "operating_mode":
         if text in {"production", "test"}:
             return text
-    elif name == "atem_ip":
+    elif name == "atem_ip" or name.endswith("_host"):
         try:
-            return str(ip_address(text))
-        except ValueError:
-            pass
-    elif name.endswith("_host"):
-        try:
-            return str(ip_address(text))
+            address = ip_address(text)
+            if name != "atem_ip" or address.version == 4:
+                return str(address)
         except ValueError:
             labels = text.removesuffix(".").split(".")
             if len(text) <= 253 and all(

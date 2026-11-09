@@ -52,7 +52,7 @@ def load_state():
             if not isinstance(data.get("Settings"), dict):
                 data["Settings"] = {}
             return data
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, UnicodeError) as error:
             print(f"Warnung: config.json ist ungültig. Lade Standardwerte. Fehler: {error}")
         except (OSError, ValueError) as error:
             print(f"Warnung: config.json konnte nicht geladen werden. Lade Standardwerte. Fehler: {error}")
